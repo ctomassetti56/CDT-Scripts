@@ -570,29 +570,105 @@ while IFS=: read -r username _ uid _; do
     fi
 done < /etc/passwd
 
-# --- 1e: Audit sudo privileges ----------------------------------------------
-log "Auditing sudo configuration..." "INFO"
+# --- 1e: Audit and REMEDIATE sudo privileges ---------------------------------
+log "Auditing and remediating sudo configuration..." "INFO"
+SUDOERS_ISSUES_FOUND=0
+
+# Helper: remove or comment out a NOPASSWD line from a sudoers file
+# Uses 'visudo -c' to validate before applying, then writes via temp file
+remediate_sudoers_nopasswd() {
+    local filepath="$1"
+    local bad_line="$2"
+    local bak="${filepath}.bak.$(date +%s)"
+
+    cp "$filepath" "$bak" 2>/dev/null && \
+        log "  Backed up: $filepath -> $bak" "INFO" || \
+        { log "  Could not back up $filepath - SKIPPING remediation for safety" "ERROR"; return 1; }
+
+    # Strategy: comment out lines containing NOPASSWD
+    # Use a temp file + visudo -c to validate before overwriting
+    local tmpfile; tmpfile=$(mktemp)
+    # Escape special chars in bad_line for sed
+    local escaped_line; escaped_line=$(printf '%s\n' "$bad_line" | sed 's/[[\.*^$()+?{|]/\\&/g')
+    sed "s|^${escaped_line}$|# SecureNix-REMOVED: &|" "$filepath" > "$tmpfile" 2>/dev/null
+
+    # Validate with visudo before applying
+    if visudo -c -f "$tmpfile" &>/dev/null; then
+        cp "$tmpfile" "$filepath"
+        log "  REMEDIATED: Commented out NOPASSWD line in $filepath" "SUCCESS"
+        log "  Removed line: $bad_line" "SUCCESS"
+        add_change "Sudoers" "Remove NOPASSWD entry" "SUCCESS" "$filepath"
+        (( SUDOERS_ISSUES_FOUND++ )) || true
+        rm -f "$tmpfile"
+        return 0
+    else
+        # visudo -c failed - the file change broke something, restore backup
+        cp "$bak" "$filepath" 2>/dev/null || true
+        log "  visudo validation failed on modified $filepath - backup restored, manual review needed!" "ERROR"
+        add_security_issue "Could not auto-remediate NOPASSWD in $filepath - MANUAL ACTION REQUIRED: $bad_line"
+        rm -f "$tmpfile"
+        return 1
+    fi
+}
+
+# Scan /etc/sudoers
 if [[ -f /etc/sudoers ]]; then
+    log "Scanning /etc/sudoers for NOPASSWD entries..." "INFO"
     while IFS= read -r line; do
-        [[ "$line" =~ ^# || -z "$line" ]] && continue
+        [[ "$line" =~ ^# || "$line" =~ ^#.*REMOVED || -z "$line" ]] && continue
         if echo "$line" | grep -qE 'NOPASSWD'; then
-            add_security_issue "NOPASSWD sudo entry in /etc/sudoers: $line"
-            log "WARNING: NOPASSWD sudo: $line" "WARNING"
+            log "NOPASSWD FOUND in /etc/sudoers: $line" "CRITICAL"
+            add_security_issue "NOPASSWD sudo in /etc/sudoers: $line"
+            log "  Attempting auto-remediation..." "WARNING"
+            remediate_sudoers_nopasswd "/etc/sudoers" "$line"
         fi
     done < /etc/sudoers
 fi
+
+# Scan /etc/sudoers.d/*
 if [[ -d /etc/sudoers.d ]]; then
+    log "Scanning /etc/sudoers.d/ for NOPASSWD entries..." "INFO"
     for sf in /etc/sudoers.d/*; do
         [[ -f "$sf" ]] || continue
-        [[ "$sf" == *greyteam* ]] && continue  # Rule 5
+        [[ "$sf" == *greyteam* ]] && {
+            log "  SKIPPING (Rule 5 - greyteam file): $sf" "SKIPPED"
+            continue
+        }
         while IFS= read -r line; do
-            [[ "$line" =~ ^# || -z "$line" ]] && continue
+            [[ "$line" =~ ^# || "$line" =~ ^#.*REMOVED || -z "$line" ]] && continue
             if echo "$line" | grep -qE 'NOPASSWD'; then
+                log "NOPASSWD FOUND in $sf: $line" "CRITICAL"
                 add_security_issue "NOPASSWD sudo in $sf: $line"
-                log "WARNING: NOPASSWD sudo in $sf: $line" "WARNING"
+                log "  Attempting auto-remediation..." "WARNING"
+                remediate_sudoers_nopasswd "$sf" "$line"
             fi
         done < "$sf"
     done
+fi
+
+# Also check for wildcard ALL=(ALL) entries that give full root without NOPASSWD
+# These are suspicious but may be intentional - flag only
+if [[ -f /etc/sudoers ]]; then
+    while IFS= read -r line; do
+        [[ "$line" =~ ^# || -z "$line" ]] && continue
+        # Non-competition users with ALL privileges
+        if echo "$line" | grep -qE 'ALL=\(ALL\).*ALL|ALL=\(ALL:ALL\).*ALL'; then
+            username_part=$(echo "$line" | awk '{print $1}')
+            # Check if it's a non-packet user (excluding % groups like %sudo which are OK)
+            if [[ ! "$username_part" =~ ^% ]]; then
+                if ! is_safe_user "$username_part" 2>/dev/null; then
+                    log "SUSPICIOUS: Non-packet user with full sudo in /etc/sudoers: $line" "CRITICAL"
+                    add_security_issue "Suspicious full sudo for non-packet user: $line"
+                fi
+            fi
+        fi
+    done < /etc/sudoers
+fi
+
+if [[ $SUDOERS_ISSUES_FOUND -eq 0 ]]; then
+    log "Sudo configuration looks clean - no NOPASSWD entries found." "SUCCESS"
+else
+    log "$SUDOERS_ISSUES_FOUND NOPASSWD sudo issue(s) remediated." "SUCCESS"
 fi
 
 # --- 1f: Audit SSH authorized_keys for ALL users ----------------------------
@@ -602,108 +678,262 @@ for homedir in /home/*/; do
     auth_keys="$homedir/.ssh/authorized_keys"
     username=$(basename "$homedir")
     if [[ -f "$auth_keys" ]]; then
-        key_count=$(grep -vc '^#\|^$' "$auth_keys" 2>/dev/null || echo 0)
-        if is_admin_user "$username"; then
-            log "Kept authorized_keys for admin: $username ($key_count keys)" "INFO"
+        # grep -c counts lines in the file itself; strip any whitespace to get a clean integer
+        key_count=$(grep -c '' "$auth_keys" 2>/dev/null | tr -d '[:space:]' || echo 0)
+        key_count=$(( key_count + 0 ))   # force integer
+        # Count only non-comment, non-blank lines for the actual key count
+        real_keys=$(grep -Evc '^\s*#|^\s*$' "$auth_keys" 2>/dev/null | tr -d '[:space:]' || echo 0)
+        real_keys=$(( real_keys + 0 ))
+        # Protect authorized admin accounts AND the current operator - keep their keys
+        if is_admin_user "$username" || [[ "$username" == "$CURRENT_OPERATOR" ]]; then
+            log "Kept authorized_keys for admin/operator: $username ($real_keys key(s))" "INFO"
         else
             cp "$auth_keys" "${auth_keys}.bak.$(date +%s)" 2>/dev/null || true
             > "$auth_keys"
-            log "Cleared authorized_keys for: $username ($key_count keys removed)" "REMOVED"
+            log "Cleared authorized_keys for: $username ($real_keys key(s) removed)" "REMOVED"
             add_change "SSH" "Clear authorized_keys" "SUCCESS" "$username"
-            [[ $key_count -gt 0 ]] && \
-                add_security_issue "Cleared $key_count SSH key(s) from: $username"
+            if [[ $real_keys -gt 0 ]]; then
+                add_security_issue "Cleared $real_keys SSH key(s) from non-admin user: $username"
+            fi
         fi
     fi
 done
-# Root authorized_keys - always flag
+# Root authorized_keys - always flag and clear
 if [[ -f /root/.ssh/authorized_keys ]]; then
-    key_count=$(grep -vc '^#\|^$' /root/.ssh/authorized_keys 2>/dev/null || echo 0)
-    if [[ $key_count -gt 0 ]]; then
-        add_security_issue "SSH authorized_keys found for ROOT ($key_count keys) - review immediately!"
-        log "WARNING: root authorized_keys has $key_count key(s) - review manually!" "WARNING"
+    real_keys=$(grep -Evc '^\s*#|^\s*$' /root/.ssh/authorized_keys 2>/dev/null | tr -d '[:space:]' || echo 0)
+    real_keys=$(( real_keys + 0 ))
+    if [[ $real_keys -gt 0 ]]; then
+        cp /root/.ssh/authorized_keys "/root/.ssh/authorized_keys.bak.$(date +%s)" 2>/dev/null || true
+        > /root/.ssh/authorized_keys
+        add_security_issue "CLEARED $real_keys SSH key(s) from ROOT authorized_keys!"
+        log "CRITICAL: Cleared $real_keys key(s) from root authorized_keys!" "CRITICAL"
+        add_change "SSH" "Clear ROOT authorized_keys" "SUCCESS" "$real_keys key(s) removed"
+    else
+        log "root authorized_keys is empty - OK." "INFO"
     fi
 fi
 
-# --- 1g: Interactive password change (Rule 14 enforced) ---------------------
-echo ""
-echo -e "${C_CYAN}============================================================${C_RESET}"
-echo -e "${C_CYAN}  PHASE 1 - STEP 1.5: PASSWORD CHANGES (Rule 14)${C_RESET}"
-echo -e "${C_CYAN}============================================================${C_RESET}"
-echo ""
-echo -e "${C_RED}${C_BOLD}CRITICAL - RULE 14: Max $MAX_PASSWORD_CHANGES password changes per host per session!${C_RESET}"
-echo -e "${C_YELLOW}Update passwords on the SCORING PORTAL first: https://scoring.mlp.local:443${C_RESET}"
-echo ""
+# --- 1g: SecureWin-parity password selector (Step 1.5) ----------------------
+log "" "INFO"
+log "Step 1.5: Selective password reset (max $MAX_PASSWORD_CHANGES users per host per session)..." "CRITICAL"
+log "A menu will be displayed. Select up to $MAX_PASSWORD_CHANGES users to reset to the team password." "INFO"
+log "CRITICAL: Update passwords on the SCORING PORTAL FIRST: https://scoring.mlp.local:443" "WARNING"
 
+# Dedicated password change log (separate file like SecureWin)
+PW_CHANGE_LOG="$LOG_DIR/3-user-password-changes-$(date +%Y-%m-%d-%H%M%S).log"
+pw_log() {
+    local msg="$1"
+    local timestamp; timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] $msg" >> "$PW_CHANGE_LOG"
+    log "  [PW-LOG] $msg" "INFO"
+}
+pw_log "Host: $HOSTNAME_VAL"
+pw_log "Operator: $CURRENT_OPERATOR"
+pw_log "Purpose: Track up to $MAX_PASSWORD_CHANGES password changes per host per competition day"
+pw_log "Rule 14: MAX $MAX_PASSWORD_CHANGES CHANGES ENFORCED"
+log "Password change log: $PW_CHANGE_LOG" "INFO"
+
+# Handle placeholder password - prompt interactively
 if [[ "$SET_ALL_USER_PASSWORDS" == "<CHANGE-THIS-BEFORE-RUNNING>" ]]; then
-    echo -e "${C_RED}WARNING: SET_ALL_USER_PASSWORDS is still the default placeholder!${C_RESET}"
-    echo -e "${C_YELLOW}Please enter the new password to set for competition users:${C_RESET}"
-    read -rs -p "$(echo -e "${C_CYAN}New password (hidden): ${C_RESET}")" input_password
     echo ""
-    read -rs -p "$(echo -e "${C_CYAN}Confirm password: ${C_RESET}")" input_password2
-    echo ""
-    if [[ "$input_password" != "$input_password2" ]]; then
-        log "Passwords did not match - skipping password changes." "ERROR"
+    echo -e "${C_RED}${C_BOLD}WARNING: SET_ALL_USER_PASSWORDS is still the default placeholder!${C_RESET}"
+    echo -e "${C_YELLOW}Enter the new password to set for selected users (input hidden):${C_RESET}"
+    read -rs -p "$(echo -e "${C_CYAN}New password: ${C_RESET}")" input_password; echo ""
+    read -rs -p "$(echo -e "${C_CYAN}Confirm:      ${C_RESET}")" input_password2; echo ""
+    if [[ -z "$input_password" ]]; then
+        log "Empty password entered - password changes will be skipped." "ERROR"
+        pw_log "SKIPPED: Empty password entered by operator."
+    elif [[ "$input_password" != "$input_password2" ]]; then
+        log "Passwords did not match - password changes will be skipped." "ERROR"
+        pw_log "SKIPPED: Passwords did not match."
         input_password=""
-    elif [[ -z "$input_password" ]]; then
-        log "Empty password entered - skipping password changes." "ERROR"
     else
         SET_ALL_USER_PASSWORDS="$input_password"
         log "Password accepted from interactive input." "INFO"
+        pw_log "Password accepted from interactive input (not logged for security)."
     fi
 fi
 
-if [[ "$SET_ALL_USER_PASSWORDS" != "<CHANGE-THIS-BEFORE-RUNNING>" && -n "$SET_ALL_USER_PASSWORDS" ]]; then
-    echo ""
-    echo -e "${C_YELLOW}The following competition users exist on this host:${C_RESET}"
-    echo ""
-    EXISTING_COMP_USERS=()
-    for cuser in "${COMP_USERS[@]}"; do
-        if id "$cuser" &>/dev/null; then
-            EXISTING_COMP_USERS+=("$cuser")
-            echo -e "  ${C_WHITE}$cuser${C_RESET}"
-        fi
-    done
-    echo ""
-    echo -e "${C_YELLOW}Password changes remaining: ${C_RED}${C_BOLD}$MAX_PASSWORD_CHANGES${C_RESET}"
-    echo ""
-    read -rp "$(echo -e "${C_CYAN}Change passwords for ALL existing comp users? (y/N): ${C_RESET}")" do_pw_change
-
-    if [[ "${do_pw_change,,}" == "y" ]]; then
-        for cuser in "${EXISTING_COMP_USERS[@]}"; do
-            if [[ $PASSWORD_CHANGE_COUNT -ge $MAX_PASSWORD_CHANGES ]]; then
-                echo ""
-                echo -e "${C_RED}${C_BOLD}RULE 14 LIMIT REACHED: $MAX_PASSWORD_CHANGES password changes used.${C_RESET}"
-                echo -e "${C_RED}STOPPING password changes to avoid rule violation!${C_RESET}"
-                log "Rule 14 limit reached - stopping password changes at $PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES" "CRITICAL"
-                break
-            fi
-
-            remaining=$(( MAX_PASSWORD_CHANGES - PASSWORD_CHANGE_COUNT ))
-            echo ""
-            echo -e "${C_YELLOW}  User: ${C_WHITE}$cuser${C_RESET}  |  Changes remaining after this: ${C_RED}$(( remaining - 1 ))${C_RESET}"
-            read -rp "$(echo -e "${C_CYAN}  Change password for '$cuser'? (y/N/q to quit): ${C_RESET}")" pw_confirm
-
-            if [[ "${pw_confirm,,}" == "q" ]]; then
-                log "Password changes halted by operator at: $PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES" "INFO"
-                break
-            elif [[ "${pw_confirm,,}" == "y" ]]; then
-                if echo "$cuser:$SET_ALL_USER_PASSWORDS" | chpasswd 2>/dev/null; then
-                    (( PASSWORD_CHANGE_COUNT++ )) || true
-                    log "Password changed: $cuser ($PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES used)" "SUCCESS"
-                    add_change "Users" "Change password" "SUCCESS" "$cuser ($PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES)"
-                else
-                    log "Failed to change password for: $cuser" "ERROR"
-                fi
-            else
-                log "Password change SKIPPED for: $cuser" "SKIPPED"
-            fi
-        done
-        log "Password changes complete: $PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES used." "INFO"
-    else
-        log "Password changes skipped by operator." "SKIPPED"
-    fi
+if [[ "$SET_ALL_USER_PASSWORDS" == "<CHANGE-THIS-BEFORE-RUNNING>" || -z "$SET_ALL_USER_PASSWORDS" ]]; then
+    log "Step 1.5 skipped - no valid password configured." "SKIPPED"
+    pw_log "Step 1.5 skipped - no valid password."
 else
-    log "Password changes skipped (no password configured)." "SKIPPED"
+    # -----------------------------------------------------------------------
+    # Build user table - ALL users on the system (not just comp users)
+    # Show username, UID, groups they belong to (like SecureWin shows groups)
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${C_CYAN}========================================${C_RESET}"
+    echo -e "${C_YELLOW}  USER LIST - SELECT UP TO $MAX_PASSWORD_CHANGES FOR PASSWORD RESET${C_RESET}"
+    echo -e "${C_CYAN}========================================${C_RESET}"
+    echo ""
+
+    # Collect all users with UID >= 1000 (real human accounts) + root
+    declare -a PW_MENU_USERS
+    declare -a PW_MENU_UIDS
+    declare -a PW_MENU_GROUPS
+    declare -a PW_MENU_STATUS
+
+    pw_idx=0
+    # Always include root first
+    PW_MENU_USERS[$pw_idx]="root"
+    PW_MENU_UIDS[$pw_idx]="0"
+    root_groups=$(groups root 2>/dev/null | sed 's/.*: //' || echo "root")
+    PW_MENU_GROUPS[$pw_idx]="$root_groups"
+    root_locked=$(passwd -S root 2>/dev/null | awk '{print $2}' || echo "?")
+    PW_MENU_STATUS[$pw_idx]="$root_locked"
+    (( pw_idx++ )) || true
+
+    # All human accounts (UID >= 1000, exclude nobody at 65534)
+    while IFS=: read -r uname _ uid _ _ _ _; do
+        [[ $uid -lt 1000 || $uid -eq 65534 ]] && continue
+        PW_MENU_USERS[$pw_idx]="$uname"
+        PW_MENU_UIDS[$pw_idx]="$uid"
+        ugroups=$(groups "$uname" 2>/dev/null | sed 's/.*: //' || echo "-")
+        PW_MENU_GROUPS[$pw_idx]="$ugroups"
+        ulocked=$(passwd -S "$uname" 2>/dev/null | awk '{print $2}' || echo "?")
+        PW_MENU_STATUS[$pw_idx]="$ulocked"
+        (( pw_idx++ )) || true
+    done < /etc/passwd
+
+    TOTAL_PW_USERS=$pw_idx
+
+    # Display the table - mirroring SecureWin's Format-Table layout
+    printf "\n"
+    printf "  ${C_CYAN}%-6s${C_RESET}  ${C_WHITE}%-18s${C_RESET}  %-6s  %-8s  %s\n" \
+        "Index" "User" "UID" "Status" "Groups"
+    printf "  %-6s  %-18s  %-6s  %-8s  %s\n" \
+        "------" "------------------" "------" "--------" "--------------------------------------------"
+    for (( i=0; i<TOTAL_PW_USERS; i++ )); do
+        num=$(( i + 1 ))
+        uname="${PW_MENU_USERS[$i]}"
+        uid="${PW_MENU_UIDS[$i]}"
+        status="${PW_MENU_STATUS[$i]}"
+        grps="${PW_MENU_GROUPS[$i]}"
+
+        # Color code: comp packet users in green, operator in cyan, others in white
+        if is_safe_user "$uname" 2>/dev/null && [[ "$uname" != "root" ]]; then
+            ucolor="$C_GREEN"
+        elif [[ "$uname" == "$CURRENT_OPERATOR" ]]; then
+            ucolor="$C_CYAN"
+        else
+            ucolor="$C_YELLOW"
+        fi
+
+        printf "  ${C_WHITE}[%-4s]${C_RESET}  ${ucolor}%-18s${C_RESET}  %-6s  %-8s  %s\n" \
+            "$num" "$uname" "$uid" "$status" "$grps"
+    done
+
+    echo ""
+    echo -e "  ${C_GREEN}Green${C_RESET}  = Competition packet user  |  ${C_CYAN}Cyan${C_RESET}  = Operator  |  ${C_YELLOW}Yellow${C_RESET} = Other"
+    echo ""
+    echo -e "${C_YELLOW}Selection format examples:${C_RESET}"
+    echo -e "  ${C_WHITE}1,3,5${C_RESET}   (comma-separated)"
+    echo -e "  ${C_WHITE}1 3 5${C_RESET}   (space-separated)"
+    echo -e "  ${C_WHITE}q${C_RESET}       (skip all password changes)"
+    echo ""
+    echo -e "${C_RED}${C_BOLD}Rule 14: Maximum $MAX_PASSWORD_CHANGES selections allowed. Extra selections will be rejected.${C_RESET}"
+    echo ""
+
+    # Selection loop - mirrors SecureWin's while(true) validation loop
+    SELECTED_PW_INDICES=()
+    while true; do
+        read -rp "$(echo -e "${C_CYAN}Enter up to $MAX_PASSWORD_CHANGES user numbers to reset (or press Enter/q to skip): ${C_RESET}")" raw_sel
+
+        # Skip / quit
+        if [[ -z "$raw_sel" || "${raw_sel,,}" =~ ^(q|quit|exit|skip)$ ]]; then
+            log "No users selected for password reset (skipped by operator)." "WARNING"
+            pw_log "No users selected (skipped)."
+            break
+        fi
+
+        # Parse comma and/or space separated numbers
+        IFS=', ' read -ra raw_parts <<< "$raw_sel"
+        parsed_nums=()
+        bad_input=false
+        for part in "${raw_parts[@]}"; do
+            [[ -z "$part" ]] && continue
+            if ! [[ "$part" =~ ^[0-9]+$ ]]; then
+                echo -e "${C_RED}Invalid input: '$part' is not a number. Try again.${C_RESET}"
+                bad_input=true; break
+            fi
+            n=$(( part + 0 ))
+            if [[ $n -lt 1 || $n -gt $TOTAL_PW_USERS ]]; then
+                echo -e "${C_RED}Number $n is out of range (1-$TOTAL_PW_USERS). Try again.${C_RESET}"
+                bad_input=true; break
+            fi
+            # Deduplicate
+            already=false
+            for existing in "${parsed_nums[@]}"; do [[ "$existing" == "$n" ]] && already=true && break; done
+            $already || parsed_nums+=("$n")
+        done
+        $bad_input && continue
+
+        if [[ ${#parsed_nums[@]} -gt $MAX_PASSWORD_CHANGES ]]; then
+            echo -e "${C_RED}${C_BOLD}Rule 14 enforcement: You selected ${#parsed_nums[@]} users but maximum is $MAX_PASSWORD_CHANGES. Try again.${C_RESET}"
+            continue
+        fi
+
+        SELECTED_PW_INDICES=("${parsed_nums[@]}")
+        break
+    done
+
+    # Perform the password changes if selections were made
+    if [[ ${#SELECTED_PW_INDICES[@]} -gt 0 ]]; then
+        # Build the selected user list for display
+        echo ""
+        echo -e "${C_YELLOW}Selected users for password reset:${C_RESET}"
+        SELECTED_PW_USERNAMES=()
+        for idx in "${SELECTED_PW_INDICES[@]}"; do
+            real_idx=$(( idx - 1 ))
+            uname="${PW_MENU_USERS[$real_idx]}"
+            SELECTED_PW_USERNAMES+=("$uname")
+            echo -e "  ${C_WHITE}- $uname${C_RESET}"
+        done
+        echo ""
+
+        # Confirmation prompt - mirrors SecureWin's Y/N confirm
+        read -rp "$(echo -e "${C_CYAN}Proceed with resetting passwords for these users to the team password? (Y/N): ${C_RESET}")" pw_confirm
+        if [[ "${pw_confirm^^}" != "Y" ]]; then
+            log "Password reset cancelled by operator." "WARNING"
+            pw_log "Cancelled. Intended: $(IFS=', '; echo "${SELECTED_PW_USERNAMES[*]}")"
+        else
+            pw_success=0
+            pw_fail=0
+            for uname in "${SELECTED_PW_USERNAMES[@]}"; do
+                if ! id "$uname" &>/dev/null; then
+                    log "Cannot reset password: user not found: $uname" "ERROR"
+                    pw_log "FAILED: $uname (user not found)"
+                    (( pw_fail++ )) || true
+                    continue
+                fi
+
+                if echo "$uname:$SET_ALL_USER_PASSWORDS" | chpasswd 2>/dev/null; then
+                    (( PASSWORD_CHANGE_COUNT++ )) || true
+                    log "Password changed: $uname ($PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES used)" "SUCCESS"
+                    pw_log "SUCCESS: $uname ($PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES)"
+                    add_change "Users" "Password reset (selective)" "SUCCESS" \
+                        "$uname ($PASSWORD_CHANGE_COUNT/$MAX_PASSWORD_CHANGES)"
+                    (( pw_success++ )) || true
+                else
+                    log "Failed to set password for: $uname" "ERROR"
+                    pw_log "FAILED: $uname (chpasswd error)"
+                    (( pw_fail++ )) || true
+                fi
+            done
+
+            log "Step 1.5 complete: $pw_success successful, $pw_fail failed." "INFO"
+            pw_log "Summary: $pw_success successful, $pw_fail failed."
+            pw_log "Completed. Full log: $PW_CHANGE_LOG"
+
+            echo ""
+            echo -e "${C_CYAN}Password change log written to:${C_RESET}"
+            echo -e "  ${C_CYAN}$PW_CHANGE_LOG${C_RESET}"
+            echo ""
+        fi
+    fi
+
+    unset PW_MENU_USERS PW_MENU_UIDS PW_MENU_GROUPS PW_MENU_STATUS
 fi
 
 log "Phase 1 complete." "SUCCESS"
@@ -1938,6 +2168,7 @@ echo ""
 echo -e "${C_WHITE}Script Run #:      ${C_RESET}${C_GREEN}#$SCRIPT_RUN_COUNT${C_RESET}"
 echo -e "${C_WHITE}Operator:          ${C_RESET}${C_YELLOW}$CURRENT_OPERATOR${C_RESET}"
 echo -e "${C_WHITE}Log File:          ${C_RESET}${C_YELLOW}$LOG_FILE${C_RESET}"
+echo -e "${C_WHITE}PW Change Log:     ${C_RESET}${C_YELLOW}${PW_CHANGE_LOG:-N/A}${C_RESET}"
 echo -e "${C_WHITE}Backdoor Report:   ${C_RESET}${C_YELLOW}$(ls "$LOG_DIR"/backdoor_report_*.txt 2>/dev/null | tail -1 || echo 'N/A')${C_RESET}"
 echo -e "${C_WHITE}Changes Applied:   ${C_RESET}${C_GREEN}$CHANGES_COUNT${C_RESET}"
 echo -e "${C_WHITE}Accounts Locked:   ${C_RESET}${C_CYAN}${#REMOVED_USERS[@]}${C_RESET}"
