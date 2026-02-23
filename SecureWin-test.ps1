@@ -443,12 +443,12 @@ Write-BlueTeamLog "============================================================"
 $configWarnings = @()
 
 # Check if default password was changed
-if ($SetAllUserPasswords -eq "BlueDefender2026!Secure@CDT") {
+if ($SetAllUserPasswords -eq "FriendshipIsMagic0!") {
     $configWarnings += "Default password detected - you should change `$SetAllUserPasswords to your team password!"
 }
 
 # Check if default admin users are still set
-if ($AuthorizedAdmins -contains "blueteam1" -and $AuthorizedAdmins.Count -eq 3) {
+if ($AuthorizedAdmins -contains "blueadmin" -and $AuthorizedAdmins.Count -eq 3) {
     $configWarnings += "Default admin usernames detected - you should customize `$AuthorizedAdmins with your team members!"
 }
 
@@ -993,7 +993,7 @@ foreach ($adminUser in $AuthorizedAdmins) {
             $SecurePassword = ConvertTo-SecureString $SetAllUserPasswords -AsPlainText -Force
             $userCreated = $false
             try {
-                New-LocalUser -Name $adminUser -Password $SecurePassword -FullName "Blue Team Admin" -Description "Authorized Blue Team Administrator" -PasswordNeverExpires:$true -ErrorAction Stop
+                New-LocalUser -Name $adminUser -Password $SecurePassword -FullName "Blue Team Admin" -Description "Authorized Blue Team Administrator" -PasswordNeverExpires:$false -ErrorAction Stop
                 $userCreated = $true
                 Add-Change "User Management" "Created User" $adminUser "New authorized admin user"
                 Write-BlueTeamLog "Successfully created user: $adminUser" "SUCCESS"
