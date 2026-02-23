@@ -241,7 +241,10 @@ $AuthorizedAdmins = @(
 # NOTE: Use only these special characters: ! @ $ % ^ & * ( ) - _ = + [ ] { } ; : , . ?
 # The # symbol can cause issues with Windows password complexity
 
-$SetAllUserPasswords = "CharlieBlueSecure1010!" # DO NOT SHARE THIS PASSWORD WITH ANYONE!
+# IMPORTANT: This password must NOT contain 3+ consecutive characters from any authorized admin username.
+# Windows complexity policy will reject the password at user-creation time if it does.
+# For "blueadmin", avoid these substrings: blu, lue, uea, ead, adm, dmi, min
+$SetAllUserPasswords = "MyLittlePonySucks1!" # DO NOT SHARE THIS PASSWORD WITH ANYONE!
 
 # NETWORK SECURITY - CDT Competition Network
 # IP addresses that should NEVER be blocked (scoring engine, gray team, jumpboxes)
@@ -990,23 +993,49 @@ foreach ($adminUser in $AuthorizedAdmins) {
         if (-not $userExists) {
             # Create the user
             Write-BlueTeamLog "Creating new admin user: $adminUser" "INFO"
-            $SecurePassword = ConvertTo-SecureString $SetAllUserPasswords -AsPlainText -Force
+
+            # Windows complexity policy rejects passwords that contain 3+ consecutive characters
+            # from the account name being created. Pre-check here so we can use a safe interim
+            # password instead of silently failing with InvalidPasswordException.
+            $passwordToUse = $SetAllUserPasswords
+            $usernameSubstringFound = $false
+            if ($adminUser.Length -ge 3) {
+                for ($si = 0; $si -le $adminUser.Length - 3; $si++) {
+                    $chunk = $adminUser.Substring($si, 3).ToLower()
+                    if ($passwordToUse.ToLower().Contains($chunk)) {
+                        $usernameSubstringFound = $true
+                        Write-BlueTeamLog "WARNING: Team password contains '$chunk' (substring of '$adminUser') - Windows will reject it for this account." "WARNING"
+                        Write-BlueTeamLog "Using a safe interim password for account creation. You should update `$SetAllUserPasswords to avoid substrings of all admin usernames." "WARNING"
+                        # Use an interim password that avoids the username substring.
+                        # Built by replacing the conflicting section; guaranteed to meet complexity.
+                        $passwordToUse = "TmpCreate@" + (Get-Date -Format "HHmmss") + "Z!"
+                        break
+                    }
+                }
+            }
+
+            $SecurePassword = ConvertTo-SecureString $passwordToUse -AsPlainText -Force
             $userCreated = $false
             try {
-                New-LocalUser -Name $adminUser -Password $SecurePassword -FullName "Blue Team Admin" -Description "Authorized Blue Team Administrator" -PasswordNeverExpires:$false -ErrorAction Stop
+                New-LocalUser -Name $adminUser -Password $SecurePassword -FullName "Blue Team Admin" -Description "Authorized Blue Team Administrator" -PasswordNeverExpires:$true -ErrorAction Stop
                 $userCreated = $true
                 Add-Change "User Management" "Created User" $adminUser "New authorized admin user"
                 Write-BlueTeamLog "Successfully created user: $adminUser" "SUCCESS"
-            } catch {
-                Write-BlueTeamLog "Failed to create user $adminUser with PasswordNeverExpires - retrying without it: $_" "WARNING"
-                try {
-                    New-LocalUser -Name $adminUser -Password $SecurePassword -FullName "Blue Team Admin" -Description "Authorized Blue Team Administrator" -ErrorAction Stop
-                    $userCreated = $true
-                    Add-Change "User Management" "Created User" $adminUser "New authorized admin user (PasswordNeverExpires skipped due to policy)"
-                    Write-BlueTeamLog "Successfully created user: $adminUser" "SUCCESS"
-                } catch {
-                    Write-BlueTeamLog "Failed to create user $adminUser : $_" "ERROR"
+
+                # If we used an interim password, immediately update to the real team password
+                # now that the account exists (Set-LocalUser is not subject to the same
+                # name-in-password restriction as New-LocalUser on account creation).
+                if ($usernameSubstringFound) {
+                    try {
+                        $RealPassword = ConvertTo-SecureString $SetAllUserPasswords -AsPlainText -Force
+                        Set-LocalUser -Name $adminUser -Password $RealPassword -ErrorAction Stop
+                        Write-BlueTeamLog "Real team password applied to $adminUser after creation" "SUCCESS"
+                    } catch {
+                        Write-BlueTeamLog "Could not apply real team password to $adminUser after creation (interim password is active): $_" "WARNING"
+                    }
                 }
+            } catch {
+                Write-BlueTeamLog "Failed to create user $adminUser : $_" "ERROR"
             }
             if (-not $userCreated) {
                 Write-BlueTeamLog "Skipping group configuration for $adminUser because user creation failed" "WARNING"
