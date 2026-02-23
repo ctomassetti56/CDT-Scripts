@@ -1,0 +1,605 @@
+cyberrange@cjt3870-debian13-test-securenix:~/Downloads$ sudo ./SecureNix.sh
+sudo: unable to resolve host cjt3870-debian13-test-securenix: Name or service not known
+
+================================================================================
+           SecureNix.sh - Linux Hardening Script
+           CDT Team Alpha - Spring 2026 | FQDN: mlp.local
+           Time to lock out the Legion... For good :)
+================================================================================
+  Host:        cjt3870-debian13-test-securenix
+  Operator:    cyberrange
+  Script Run:  #1
+  Log File:    /var/log/blueteam/SecureNix_20260223_154800.log
+  Phases:      1,2,3,4,5,6,7,8
+================================================================================
+
+[2026-02-23 15:48:00] [INFO] SecureNix.sh started - Run #1 | Host: cjt3870-debian13-test-securenix | Operator: cyberrange
+[2026-02-23 15:48:00] [INFO] Executing phase(s): 1,2,3,4,5,6,7,8
+[2026-02-23 15:48:00] [INFO] Checking for /greyteam_key (Rule 15)...
+[2026-02-23 15:48:00] [INFO] /greyteam_key NOT found - Red Team tools should not be running here.
+
+[2026-02-23 15:48:00] [INFO] 
+[2026-02-23 15:48:00] [INFO] ============================================================
+[2026-02-23 15:48:00] [CRITICAL] PHASE 1: USER ACCOUNT MANAGEMENT
+[2026-02-23 15:48:00] [INFO] ============================================================
+[2026-02-23 15:48:00] [WARNING] Rule 9:  DO NOT disable valid competition users!
+[2026-02-23 15:48:00] [WARNING] Rule 14: Password changes limited to 3 per host per session!
+[2026-02-23 15:48:00] [INFO] Detected operator account: 'cyberrange' - this account is PROTECTED.
+[2026-02-23 15:48:00] [WARNING] Adding operator 'cyberrange' to protected list for this session.
+[2026-02-23 15:48:00] [INFO] Scanning all user accounts for unauthorized entries...
+[2026-02-23 15:48:00] [SUCCESS] No unauthorized users found.
+[2026-02-23 15:48:00] [INFO] Checking for non-root UID=0 accounts...
+[2026-02-23 15:48:00] [INFO] Auditing sudo configuration...
+[2026-02-23 15:48:00] [CRITICAL] SECURITY ISSUE: NOPASSWD sudo entry in /etc/sudoers: %sudo	ALL=(ALL:ALL) NOPASSWD: ALL
+[2026-02-23 15:48:00] [WARNING] WARNING: NOPASSWD sudo: %sudo	ALL=(ALL:ALL) NOPASSWD: ALL
+[2026-02-23 15:48:00] [CRITICAL] SECURITY ISSUE: NOPASSWD sudo in /etc/sudoers.d/90-cloud-init-users: cyberrange ALL=(ALL) NOPASSWD:ALL
+[2026-02-23 15:48:00] [WARNING] WARNING: NOPASSWD sudo in /etc/sudoers.d/90-cloud-init-users: cyberrange ALL=(ALL) NOPASSWD:ALL
+[2026-02-23 15:48:00] [INFO] Auditing SSH authorized_keys files...
+[2026-02-23 15:48:00] [REMOVED] Cleared authorized_keys for: cyberrange (0
+0 keys removed)
+./SecureNix.sh: line 612: [[: 0
+0: syntax error in expression (error token is "0")
+./SecureNix.sh: line 620: [[: 0
+0: syntax error in expression (error token is "0")
+
+============================================================
+  PHASE 1 - STEP 1.5: PASSWORD CHANGES (Rule 14)
+============================================================
+
+CRITICAL - RULE 14: Max 3 password changes per host per session!
+Update passwords on the SCORING PORTAL first: https://scoring.mlp.local:443
+
+
+The following competition users exist on this host:
+
+
+Password changes remaining: 3
+
+Change passwords for ALL existing comp users? (y/N): y
+[2026-02-23 15:48:51] [INFO] Password changes complete: 0/3 used.
+[2026-02-23 15:48:51] [SUCCESS] Phase 1 complete.
+[2026-02-23 15:48:51] [INFO] 
+[2026-02-23 15:48:51] [INFO] ============================================================
+[2026-02-23 15:48:51] [CRITICAL] PHASE 2: PASSWORD POLICY HARDENING (PAM)
+[2026-02-23 15:48:51] [INFO] ============================================================
+[2026-02-23 15:48:51] [INFO] Ensuring libpam-pwquality is installed...
+[2026-02-23 15:49:09] [INFO] The following NEW packages will be installed:
+[2026-02-23 15:49:09] [INFO] 0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+(Reading database ... 131791 files and directories currently installed.)
+[2026-02-23 15:49:09] [INFO] Hardening /etc/login.defs...
+[2026-02-23 15:49:09] [SUCCESS] login.defs updated.
+[2026-02-23 15:49:09] [INFO] Configuring /etc/security/pwquality.conf...
+[2026-02-23 15:49:09] [SUCCESS] pwquality.conf hardened.
+[2026-02-23 15:49:09] [INFO] Configuring PAM common-password...
+[2026-02-23 15:49:09] [SUCCESS] PAM common-password configured.
+[2026-02-23 15:49:09] [INFO] Configuring PAM account lockout (pam_faillock)...
+[2026-02-23 15:49:09] [SUCCESS] Account lockout configured (5 failures = 15 min lockout).
+[2026-02-23 15:49:09] [INFO] Applying password aging to competition users...
+[2026-02-23 15:49:09] [SUCCESS] Password aging applied.
+[2026-02-23 15:49:09] [SUCCESS] Phase 2 complete.
+[2026-02-23 15:49:09] [INFO] 
+[2026-02-23 15:49:09] [INFO] ============================================================
+[2026-02-23 15:49:09] [CRITICAL] PHASE 3: FIREWALL HARDENING (UFW) - SERVICE SELECTOR
+[2026-02-23 15:49:09] [INFO] ============================================================
+[2026-02-23 15:49:09] [WARNING] Rule 7:  DO NOT block entire subnets!
+[2026-02-23 15:49:09] [WARNING] Rule 10: NEVER block SSH (port 22)!
+[2026-02-23 15:49:09] [INFO] Installing UFW...
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  iptables libip4tc2 libip6tc2
+Suggested packages:
+  firewalld rsyslog
+The following NEW packages will be installed:
+  iptables libip4tc2 libip6tc2 ufw
+0 upgraded, 4 newly installed, 0 to remove and 0 not upgraded.
+Need to get 570 kB of archives.
+After this operation, 3,479 kB of additional disk space will be used.
+Get:1 http://mirrors.rit.edu/debian trixie/main amd64 libip4tc2 amd64 1.8.11-2 [20.0 kB]
+Get:2 http://mirrors.rit.edu/debian trixie/main amd64 libip6tc2 amd64 1.8.11-2 [20.3 kB]
+Get:3 http://mirrors.rit.edu/debian trixie/main amd64 iptables amd64 1.8.11-2 [361 kB]
+Get:4 http://mirrors.rit.edu/debian trixie/main amd64 ufw all 0.36.2-9 [169 kB]
+Fetched 570 kB in 10s (56.5 kB/s)
+Preconfiguring packages ...
+Selecting previously unselected package libip4tc2:amd64.
+(Reading database ... 131798 files and directories currently installed.)
+Preparing to unpack .../libip4tc2_1.8.11-2_amd64.deb ...
+Unpacking libip4tc2:amd64 (1.8.11-2) ...
+Selecting previously unselected package libip6tc2:amd64.
+Preparing to unpack .../libip6tc2_1.8.11-2_amd64.deb ...
+Unpacking libip6tc2:amd64 (1.8.11-2) ...
+Selecting previously unselected package iptables.
+Preparing to unpack .../iptables_1.8.11-2_amd64.deb ...
+Unpacking iptables (1.8.11-2) ...
+Selecting previously unselected package ufw.
+Preparing to unpack .../archives/ufw_0.36.2-9_all.deb ...
+Unpacking ufw (0.36.2-9) ...
+Setting up libip4tc2:amd64 (1.8.11-2) ...
+Setting up libip6tc2:amd64 (1.8.11-2) ...
+Setting up iptables (1.8.11-2) ...
+update-alternatives: using /usr/sbin/iptables-legacy to provide /usr/sbin/iptables (iptables) in auto mode
+update-alternatives: using /usr/sbin/ip6tables-legacy to provide /usr/sbin/ip6tables (ip6tables) in auto mode
+update-alternatives: using /usr/sbin/iptables-nft to provide /usr/sbin/iptables (iptables) in auto mode
+update-alternatives: using /usr/sbin/ip6tables-nft to provide /usr/sbin/ip6tables (ip6tables) in auto mode
+update-alternatives: using /usr/sbin/arptables-nft to provide /usr/sbin/arptables (arptables) in auto mode
+update-alternatives: using /usr/sbin/ebtables-nft to provide /usr/sbin/ebtables (ebtables) in auto mode
+Setting up ufw (0.36.2-9) ...
+Creating config file /etc/ufw/before.rules with new version
+Creating config file /etc/ufw/before6.rules with new version
+Creating config file /etc/ufw/after.rules with new version
+Creating config file /etc/ufw/after6.rules with new version
+Created symlink '/etc/systemd/system/multi-user.target.wants/ufw.service' → '/usr/lib/systemd/system/ufw.service'.
+Processing triggers for libc-bin (2.41-12) ...
+Processing triggers for man-db (2.13.1-1) ...
+[2026-02-23 15:49:23] [INFO] iptables rules backed up to /var/log/blueteam
+
+============================================================
+  PHASE 3 - STEP 3.1: SERVICE PORT SELECTOR
+============================================================
+
+Which service runs on THIS host? (SSH port 22 is ALWAYS opened)
+
+  [1] ponyville       - Apache2/HTTP     (ports: 80, 443)
+  [2] seaddle         - MariaDB          (ports: 3306)
+  [3] trotsylvania    - CUPS Printing    (ports: 631 tcp+udp)
+  [4] crystal-empire  - vsftpd/FTP       (ports: 20, 21)
+  [5] everfree-forest - IRC              (ports: 6667, 6697)
+  [6] griffonstone    - Nginx/HTTP       (ports: 80, 443)
+  [7] Ubuntu Workstation - No service port  (SSH only)
+
+Also always opened: 443 (scoring portal), 444 (scoring netcat)
+
+Enter the number for this host's service [1-7]: 3
+[2026-02-23 15:49:36] [INFO] Service selected: CUPS (trotsylvania)
+[2026-02-23 15:49:36] [INFO] Service-specific ports to open: 631
+[2026-02-23 15:49:36] [INFO] Resetting UFW for clean configuration...
+Backing up 'user.rules' to '/etc/ufw/user.rules.20260223_154936'
+Backing up 'before.rules' to '/etc/ufw/before.rules.20260223_154936'
+Backing up 'after.rules' to '/etc/ufw/after.rules.20260223_154936'
+Backing up 'user6.rules' to '/etc/ufw/user6.rules.20260223_154936'
+Backing up 'before6.rules' to '/etc/ufw/before6.rules.20260223_154936'
+Backing up 'after6.rules' to '/etc/ufw/after6.rules.20260223_154936'
+
+Default incoming policy changed to 'deny'
+(be sure to update your rules accordingly)
+Default outgoing policy changed to 'allow'
+(be sure to update your rules accordingly)
+Default routed policy changed to 'deny'
+(be sure to update your rules accordingly)
+[2026-02-23 15:49:36] [INFO] Default policies: deny incoming, allow outgoing, deny forward
+[2026-02-23 15:49:36] [INFO] Opening SSH (port 22) - REQUIRED by Rule 10...
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+[2026-02-23 15:49:36] [INFO] Opening scoring portal ports (always required)...
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+[2026-02-23 15:49:37] [INFO] Opening service-specific ports for: CUPS (trotsylvania)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+[2026-02-23 15:49:37] [SUCCESS]   Opened port 631/tcp for CUPS (trotsylvania)
+[2026-02-23 15:49:37] [INFO] Whitelisting scoring engine and jumpbox IPs (individual IPs - Rule 7)...
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+Rules updated
+[2026-02-23 15:49:41] [INFO] Blocking known attack/unnecessary ports...
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+[2026-02-23 15:49:42] [INFO] Enabling UFW firewall...
+Firewall is active and enabled on system startup
+[2026-02-23 15:49:43] [INFO] UFW status:
+[2026-02-23 15:49:43] [INFO]   Status: active
+[2026-02-23 15:49:43] [INFO]   Logging: on (low)
+[2026-02-23 15:49:43] [INFO]   Default: deny (incoming), allow (outgoing), disabled (routed)
+[2026-02-23 15:49:43] [INFO]   New profiles: skip
+[2026-02-23 15:49:43] [INFO]   
+[2026-02-23 15:49:43] [INFO]   To                         Action      From
+[2026-02-23 15:49:43] [INFO]   --                         ------      ----
+[2026-02-23 15:49:43] [INFO]   22/tcp                     LIMIT IN    Anywhere                  
+[2026-02-23 15:49:43] [INFO]   443/tcp                    ALLOW IN    Anywhere                   # HTTPS - Scoring portal
+[2026-02-23 15:49:43] [INFO]   444/tcp                    ALLOW IN    Anywhere                   # Scoring engine netcat
+[2026-02-23 15:49:43] [INFO]   631/tcp                    ALLOW IN    Anywhere                   # CUPS (trotsylvania)
+[2026-02-23 15:49:43] [INFO]   631/udp                    ALLOW IN    Anywhere                   # CUPS UDP
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.100               # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.41                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.42                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.43                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.44                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.45                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.46                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.47                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.48                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.49                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    172.20.0.40                # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.10.1                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.10.2                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.10.3                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.10.4                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.10.5                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.10.6                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.20.1                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.20.2                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.20.3                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.20.4                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.30.1                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.30.2                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.30.3                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.30.4                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.30.5                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   Anywhere                   ALLOW IN    10.0.30.6                  # Competition infrastructure
+[2026-02-23 15:49:43] [INFO]   23/tcp                     DENY IN     Anywhere                   # Block Telnet
+[2026-02-23 15:49:43] [INFO]   512/tcp                    DENY IN     Anywhere                   # Block rexec
+[2026-02-23 15:49:43] [INFO]   513/tcp                    DENY IN     Anywhere                   # Block rlogin
+[2026-02-23 15:49:43] [INFO]   514/tcp                    DENY IN     Anywhere                   # Block rsh
+[2026-02-23 15:49:43] [INFO]   69/udp                     DENY IN     Anywhere                   # Block TFTP
+[2026-02-23 15:49:43] [INFO]   111/tcp                    DENY IN     Anywhere                   # Block RPC portmapper
+[2026-02-23 15:49:43] [INFO]   111/udp                    DENY IN     Anywhere                   # Block RPC portmapper
+[2026-02-23 15:49:43] [INFO]   2049/tcp                   DENY IN     Anywhere                   # Block NFS
+[2026-02-23 15:49:43] [INFO]   2049/udp                   DENY IN     Anywhere                   # Block NFS
+[2026-02-23 15:49:43] [INFO]   22/tcp (v6)                LIMIT IN    Anywhere (v6)             
+[2026-02-23 15:49:43] [INFO]   443/tcp (v6)               ALLOW IN    Anywhere (v6)              # HTTPS - Scoring portal
+[2026-02-23 15:49:43] [INFO]   444/tcp (v6)               ALLOW IN    Anywhere (v6)              # Scoring engine netcat
+[2026-02-23 15:49:43] [INFO]   631/tcp (v6)               ALLOW IN    Anywhere (v6)              # CUPS (trotsylvania)
+[2026-02-23 15:49:43] [INFO]   631/udp (v6)               ALLOW IN    Anywhere (v6)              # CUPS UDP
+[2026-02-23 15:49:43] [INFO]   23/tcp (v6)                DENY IN     Anywhere (v6)              # Block Telnet
+[2026-02-23 15:49:43] [INFO]   512/tcp (v6)               DENY IN     Anywhere (v6)              # Block rexec
+[2026-02-23 15:49:43] [INFO]   513/tcp (v6)               DENY IN     Anywhere (v6)              # Block rlogin
+[2026-02-23 15:49:43] [INFO]   514/tcp (v6)               DENY IN     Anywhere (v6)              # Block rsh
+[2026-02-23 15:49:43] [INFO]   69/udp (v6)                DENY IN     Anywhere (v6)              # Block TFTP
+[2026-02-23 15:49:43] [INFO]   111/tcp (v6)               DENY IN     Anywhere (v6)              # Block RPC portmapper
+[2026-02-23 15:49:43] [INFO]   111/udp (v6)               DENY IN     Anywhere (v6)              # Block RPC portmapper
+[2026-02-23 15:49:43] [INFO]   2049/tcp (v6)              DENY IN     Anywhere (v6)              # Block NFS
+[2026-02-23 15:49:43] [INFO]   2049/udp (v6)              DENY IN     Anywhere (v6)              # Block NFS
+[2026-02-23 15:49:43] [INFO]   
+[2026-02-23 15:49:43] [SUCCESS] Phase 3 complete.
+[2026-02-23 15:49:43] [INFO] 
+[2026-02-23 15:49:43] [INFO] ============================================================
+[2026-02-23 15:49:43] [CRITICAL] PHASE 4: SSH HARDENING
+[2026-02-23 15:49:43] [INFO] ============================================================
+[2026-02-23 15:49:43] [WARNING] Rule 10: NEVER disable SSH on Linux - HARDEN IT ONLY!
+[2026-02-23 15:49:43] [INFO] sshd_config backed up.
+[2026-02-23 15:49:43] [INFO] Applying SSH hardening settings...
+[2026-02-23 15:49:43] [INFO] AllowUsers set to: applejack bigmac blueadmin cadance celestia derpy discord fluttershy luna mayormare pinkiepie rainbowdash rarity shiningarmor snails snips spike starlight starswirl trixie twilight 
+[2026-02-23 15:49:43] [INFO] Validating SSH configuration with sshd -t...
+/etc/ssh/sshd_config line 115: Deprecated option RhostsRSAAuthentication
+[2026-02-23 15:49:43] [SUCCESS] SSH hardened and service restarted successfully.
+[2026-02-23 15:49:43] [SUCCESS] Phase 4 complete.
+[2026-02-23 15:49:43] [INFO] 
+[2026-02-23 15:49:43] [INFO] ============================================================
+[2026-02-23 15:49:43] [CRITICAL] PHASE 5: NETWORK SECURITY
+[2026-02-23 15:49:43] [INFO] ============================================================
+[2026-02-23 15:49:43] [INFO] Applying kernel network hardening (sysctl)...
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.all.rp_filter = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.default.rp_filter = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.all.accept_source_route = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.default.accept_source_route = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv6.conf.all.accept_source_route = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv6.conf.default.accept_source_route = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.all.accept_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.default.accept_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.all.secure_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.default.secure_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.all.send_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.default.send_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv6.conf.all.accept_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv6.conf.default.accept_redirects = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.tcp_syncookies = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.tcp_syn_retries = 2
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.tcp_synack_retries = 2
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.tcp_max_syn_backlog = 4096
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.ip_forward = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv6.conf.all.forwarding = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.all.log_martians = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.conf.default.log_martians = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.icmp_echo_ignore_broadcasts = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.icmp_ignore_bogus_error_responses = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.tcp_timestamps = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: net.ipv4.tcp_rfc1337 = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: kernel.randomize_va_space = 2
+[2026-02-23 15:49:43] [INFO]   sysctl: kernel.kptr_restrict = 2
+[2026-02-23 15:49:43] [INFO]   sysctl: kernel.dmesg_restrict = 1
+[2026-02-23 15:49:43] [INFO]   sysctl: fs.suid_dumpable = 0
+[2026-02-23 15:49:43] [INFO]   sysctl: kernel.core_pattern = /dev/null
+[2026-02-23 15:49:44] [INFO]   sysctl: kernel.perf_event_paranoid = 3
+[2026-02-23 15:49:44] [INFO]   sysctl: fs.protected_hardlinks = 1
+[2026-02-23 15:49:44] [INFO]   sysctl: fs.protected_symlinks = 1
+[2026-02-23 15:49:44] [SUCCESS] sysctl hardening applied.
+[2026-02-23 15:49:44] [INFO] Disabling unnecessary/vulnerable services...
+[2026-02-23 15:49:44] [WARNING] Could not stop: avahi-daemon
+[2026-02-23 15:49:44] [INFO] Removing insecure network packages...
+[2026-02-23 15:49:44] [INFO] Configuring TCP Wrappers...
+[2026-02-23 15:49:44] [SUCCESS] TCP Wrappers configured.
+[2026-02-23 15:49:44] [INFO] Blacklisting USB mass storage...
+[2026-02-23 15:49:44] [INFO] USB storage blacklisted.
+[2026-02-23 15:49:44] [SUCCESS] Phase 5 complete.
+[2026-02-23 15:49:44] [INFO] 
+[2026-02-23 15:49:44] [INFO] ============================================================
+[2026-02-23 15:49:44] [CRITICAL] PHASE 6: BACKDOOR DETECTION
+[2026-02-23 15:49:44] [INFO] ============================================================
+[2026-02-23 15:49:44] [INFO] Writing backdoor report to: /var/log/blueteam/backdoor_report_20260223_154944.txt
+[2026-02-23 15:49:44] [INFO] Scanning for unexpected listening ports...
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 1
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 1
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 2
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 2
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 3
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 3
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 4
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 4
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 7
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 7
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 8
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 8
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 9
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 9
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 85
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 85
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 341
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 341
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 546
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 546
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 5353
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 5353
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 42686
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 42686
+[2026-02-23 15:49:44] [CRITICAL] SUSPICIOUS LISTENING PORT: 46286
+[2026-02-23 15:49:44] [CRITICAL] SECURITY ISSUE: Unexpected listening port: 46286
+[2026-02-23 15:49:44] [INFO] Scanning for SUID/SGID binaries...
+[2026-02-23 15:49:50] [CRITICAL] UNUSUAL SUID FILE: /usr/lib/xorg/Xorg.wrap
+[2026-02-23 15:49:50] [CRITICAL] SECURITY ISSUE: Unusual SUID file: /usr/lib/xorg/Xorg.wrap
+[2026-02-23 15:49:50] [CRITICAL] UNUSUAL SUID FILE: /usr/lib/polkit-1/polkit-agent-helper-1
+[2026-02-23 15:49:50] [CRITICAL] SECURITY ISSUE: Unusual SUID file: /usr/lib/polkit-1/polkit-agent-helper-1
+[2026-02-23 15:49:50] [CRITICAL] UNUSUAL SUID FILE: /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+[2026-02-23 15:49:50] [CRITICAL] SECURITY ISSUE: Unusual SUID file: /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+[2026-02-23 15:49:50] [CRITICAL] UNUSUAL SUID FILE: /usr/bin/ntfs-3g
+[2026-02-23 15:49:50] [CRITICAL] SECURITY ISSUE: Unusual SUID file: /usr/bin/ntfs-3g
+[2026-02-23 15:49:50] [CRITICAL] UNUSUAL SUID FILE: /usr/bin/fusermount3
+[2026-02-23 15:49:50] [CRITICAL] SECURITY ISSUE: Unusual SUID file: /usr/bin/fusermount3
+[2026-02-23 15:49:50] [CRITICAL] UNUSUAL SUID FILE: /usr/sbin/userhelper
+[2026-02-23 15:49:50] [CRITICAL] SECURITY ISSUE: Unusual SUID file: /usr/sbin/userhelper
+[2026-02-23 15:49:50] [INFO] Auditing scheduled tasks...
+[2026-02-23 15:49:50] [INFO] Checking running services and startup scripts...
+[2026-02-23 15:49:50] [INFO] Scanning for world-writable files in sensitive paths...
+[2026-02-23 15:49:50] [INFO] Auditing /etc/passwd and /etc/shadow...
+[2026-02-23 15:49:50] [INFO] Capturing process and network snapshot...
+[2026-02-23 15:49:50] [INFO] Scanning /tmp and /dev/shm for executables...
+[2026-02-23 15:49:50] [INFO] Checking /etc/hosts for DNS poisoning...
+[2026-02-23 15:49:50] [INFO] Auditing shell init files...
+[2026-02-23 15:49:50] [INFO] Checking loaded kernel modules...
+[2026-02-23 15:49:50] [SUCCESS] Backdoor scan complete. Report saved: /var/log/blueteam/backdoor_report_20260223_154944.txt
+[2026-02-23 15:49:50] [WARNING] Security issues found so far: 2
+[2026-02-23 15:49:50] [SUCCESS] Phase 6 complete.
+[2026-02-23 15:49:50] [INFO] 
+[2026-02-23 15:49:50] [INFO] ============================================================
+[2026-02-23 15:49:50] [CRITICAL] PHASE 7: SYSTEM HARDENING
+[2026-02-23 15:49:50] [INFO] ============================================================
+[2026-02-23 15:49:50] [INFO] Hardening sensitive file permissions...
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/sudoers -> 440
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/hosts.deny -> 644
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/crontab -> 600
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/passwd -> 644
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/ssh/sshd_config -> 600
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/shadow -> 640
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/hosts -> 644
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/gshadow -> 640
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /boot/grub/grub.cfg -> 600
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/group -> 644
+[2026-02-23 15:49:50] [SUCCESS]   Permissions set: /etc/hosts.allow -> 644
+[2026-02-23 15:49:50] [INFO] Hardening /tmp mount options...
+[2026-02-23 15:49:50] [SUCCESS] /tmp remounted: noexec,nosuid,nodev
+[2026-02-23 15:49:50] [INFO] Hardening /dev/shm...
+[2026-02-23 15:49:50] [SUCCESS] /dev/shm remounted: noexec,nosuid,nodev
+[2026-02-23 15:49:50] [INFO] Disabling core dumps...
+[2026-02-23 15:49:50] [INFO] Checking and enforcing AppArmor...
+[2026-02-23 15:49:50] [WARNING] Some AppArmor profiles could not be enforced.
+[2026-02-23 15:49:50] [INFO] Restricting compiler execute permissions for others...
+[2026-02-23 15:49:50] [INFO]   Restricted execute for others: /usr/bin/gcc
+[2026-02-23 15:49:50] [INFO]   Restricted execute for others: /usr/bin/g++
+[2026-02-23 15:49:50] [INFO]   Restricted execute for others: /usr/bin/cc
+[2026-02-23 15:49:50] [INFO]   Restricted execute for others: /usr/bin/make
+[2026-02-23 15:49:50] [INFO]   Restricted execute for others: /usr/bin/python3
+[2026-02-23 15:49:50] [INFO] Restricting cron/at access to root only...
+[2026-02-23 15:49:50] [INFO] Disabling Ctrl+Alt+Del reboot...
+[2026-02-23 15:49:50] [SUCCESS] Ctrl+Alt+Del reboot disabled.
+[2026-02-23 15:49:50] [INFO] Removing offensive security tools if present...
+[2026-02-23 15:49:50] [WARNING]   Could not remove: netcat-traditional
+[2026-02-23 15:49:51] [WARNING]   Could not remove: netcat-openbsd
+[2026-02-23 15:49:51] [INFO] Setting competition MOTD...
+[2026-02-23 15:49:51] [INFO] Enabling unattended security updates...
+[2026-02-23 15:49:51] [SUCCESS] Phase 7 complete.
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [CRITICAL] PHASE 8: AUDIT LOGGING (auditd)
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [INFO] Installing auditd and audisp plugins...
+[2026-02-23 15:49:51] [ERROR] auditd install failed - logging may be incomplete.
+[2026-02-23 15:49:51] [INFO] Writing audit rules to /etc/audit/rules.d/99-blueteam.rules...
+[2026-02-23 15:49:51] [WARNING] Could not start auditd.
+[2026-02-23 15:49:51] [INFO] Configuring log rotation for /var/log/blueteam/...
+[2026-02-23 15:49:51] [SUCCESS] Log rotation configured.
+[2026-02-23 15:49:51] [SUCCESS] Phase 8 complete.
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [CRITICAL] GENERATING FINAL REPORT
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [INFO]   Host:               cjt3870-debian13-test-securenix
+[2026-02-23 15:49:51] [INFO]   Operator:           cyberrange
+[2026-02-23 15:49:51] [INFO]   Start time:         2026-02-23 15:48:00
+[2026-02-23 15:49:51] [INFO]   End time:           2026-02-23 15:49:51
+[2026-02-23 15:49:51] [INFO]   Duration:           111s
+[2026-02-23 15:49:51] [INFO]   Script run #:       1
+[2026-02-23 15:49:51] [INFO]   Total changes:      33
+[2026-02-23 15:49:51] [INFO]   Accounts locked:    0
+[2026-02-23 15:49:51] [INFO]   Security issues:    2
+[2026-02-23 15:49:51] [INFO]   Passwords changed:  0 / 3 (Rule 14)
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [INFO] CHANGES APPLIED:
+[2026-02-23 15:49:51] [INFO]   + [SSH] Clear authorized_keys - SUCCESS | cyberrange
+[2026-02-23 15:49:51] [INFO]   + [PasswordPolicy] login.defs hardened - SUCCESS | 90d max, 12 char min
+[2026-02-23 15:49:51] [INFO]   + [PasswordPolicy] pwquality.conf hardened - SUCCESS | minlen=12 minclass=3
+[2026-02-23 15:49:51] [INFO]   + [PasswordPolicy] PAM common-password - SUCCESS | pwquality enforced, remember=5
+[2026-02-23 15:49:51] [INFO]   + [PasswordPolicy] PAM pam_faillock - SUCCESS | deny=5 unlock=15min
+[2026-02-23 15:49:51] [INFO]   + [PasswordPolicy] chage aging on comp users - SUCCESS | 90d max, 1d min, 7d warn
+[2026-02-23 15:49:51] [INFO]   + [Firewall] Service selected - INFO | CUPS (trotsylvania)
+[2026-02-23 15:49:51] [INFO]   + [Firewall] SSH allowed + rate-limited (Rule 10) - SUCCESS | port 22/tcp
+[2026-02-23 15:49:51] [INFO]   + [Firewall] Scoring engine ports opened - SUCCESS | 443, 444
+[2026-02-23 15:49:51] [INFO]   + [Firewall] Service ports opened - SUCCESS | 631
+[2026-02-23 15:49:51] [INFO]   + [Firewall] Safe IPs whitelisted - SUCCESS | 29 IPs
+[2026-02-23 15:49:51] [INFO]   + [Firewall] Attack ports blocked - SUCCESS | Telnet,rsh,TFTP,RPC,NFS
+[2026-02-23 15:49:51] [INFO]   + [Firewall] UFW enabled - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SSH] sshd hardened and restarted - SUCCESS | PermitRootLogin=no X11=no AgentFwd=no TcpFwd=no AllowUsers set
+[2026-02-23 15:49:51] [INFO]   + [Network] Kernel sysctl hardening applied - SUCCESS | ASLR,SYN-cookies,RP-filter,ICMP-hardening,anti-spoof
+[2026-02-23 15:49:51] [INFO]   + [Network] Disable service - SUCCESS | avahi-daemon
+[2026-02-23 15:49:51] [INFO]   + [Network] TCP Wrappers configured - SUCCESS | deny all, allow safe IPs
+[2026-02-23 15:49:51] [INFO]   + [Network] USB mass storage blacklisted - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [Backdoor] Detection scan complete - SUCCESS | Report: /var/log/blueteam/backdoor_report_20260223_154944.txt
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Sensitive file permissions hardened - SUCCESS | shadow=640 sudoers=440 sshd_config=600
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] /tmp hardened - SUCCESS | noexec,nosuid,nodev
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] /dev/shm hardened - SUCCESS | noexec,nosuid,nodev
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Core dumps disabled - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] AppArmor enforced - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Compiler access restricted for others - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Cron/at restricted to root - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Ctrl+Alt+Del disabled - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Remove offensive tool - SUCCESS | netcat-traditional
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Remove offensive tool - SUCCESS | netcat-openbsd
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] MOTD configured - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [SystemHardening] Unattended security upgrades enabled - SUCCESS
+[2026-02-23 15:49:51] [INFO]   + [Auditing] auditd configured and started - SUCCESS | 99-blueteam.rules loaded
+[2026-02-23 15:49:51] [INFO]   + [Auditing] Log rotation configured for /var/log/blueteam/ - SUCCESS
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [CRITICAL] SECURITY ISSUES DETECTED (2 total):
+[2026-02-23 15:49:51] [CRITICAL]   ! NOPASSWD sudo entry in /etc/sudoers: %sudo	ALL=(ALL:ALL) NOPASSWD: ALL
+[2026-02-23 15:49:51] [CRITICAL]   ! NOPASSWD sudo in /etc/sudoers.d/90-cloud-init-users: cyberrange ALL=(ALL) NOPASSWD:ALL
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [INFO] SAFE IPs WHITELISTED (29 total):
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.100
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.41
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.42
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.43
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.44
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.45
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.46
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.47
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.48
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.49
+[2026-02-23 15:49:51] [INFO]   - 172.20.0.40
+[2026-02-23 15:49:51] [INFO]   - 10.0.10.1
+[2026-02-23 15:49:51] [INFO]   - 10.0.10.2
+[2026-02-23 15:49:51] [INFO]   - 10.0.10.3
+[2026-02-23 15:49:51] [INFO]   - 10.0.10.4
+[2026-02-23 15:49:51] [INFO]   - 10.0.10.5
+[2026-02-23 15:49:51] [INFO]   - 10.0.10.6
+[2026-02-23 15:49:51] [INFO]   - 10.0.20.1
+[2026-02-23 15:49:51] [INFO]   - 10.0.20.2
+[2026-02-23 15:49:51] [INFO]   - 10.0.20.3
+[2026-02-23 15:49:51] [INFO]   - 10.0.20.4
+[2026-02-23 15:49:51] [INFO]   - 10.0.30.1
+[2026-02-23 15:49:51] [INFO]   - 10.0.30.2
+[2026-02-23 15:49:51] [INFO]   - 10.0.30.3
+[2026-02-23 15:49:51] [INFO]   - 10.0.30.4
+[2026-02-23 15:49:51] [INFO]   - 10.0.30.5
+[2026-02-23 15:49:51] [INFO]   - 10.0.30.6
+[2026-02-23 15:49:51] [INFO]   - 127.0.0.1
+[2026-02-23 15:49:51] [INFO]   - ::1
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [CRITICAL] BLUE TEAM RECOMMENDATIONS - CDT COMPETITION:
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [WARNING]  1. REBOOT to apply all kernel/mount/auditd changes
+[2026-02-23 15:49:51] [WARNING]  2. REVIEW log file for errors: /var/log/blueteam/SecureNix_20260223_154800.log
+[2026-02-23 15:49:51] [WARNING]  3. VERIFY scoring engine: curl -k https://scoring.mlp.local:443
+[2026-02-23 15:49:51] [WARNING]  4. NETCAT scoring: nc scoring.mlp.local 444
+[2026-02-23 15:49:51] [WARNING]  5. CHECK your scored service is still running!
+[2026-02-23 15:49:51] [WARNING]       Apache2:  systemctl status apache2
+[2026-02-23 15:49:51] [WARNING]       MariaDB:  systemctl status mariadb
+[2026-02-23 15:49:51] [WARNING]       CUPS:     systemctl status cups
+[2026-02-23 15:49:51] [WARNING]       vsftpd:   systemctl status vsftpd
+[2026-02-23 15:49:51] [WARNING]       IRC:      systemctl status ngircd || inspircd
+[2026-02-23 15:49:51] [WARNING]       Nginx:    systemctl status nginx
+[2026-02-23 15:49:51] [WARNING]  6. VERIFY competition users can SSH into the system
+[2026-02-23 15:49:51] [CRITICAL]  7. RULE 14: 0/3 password changes used this session!
+[2026-02-23 15:49:51] [CRITICAL]  8. RULE 10: SSH is HARDENED but NEVER DISABLED on Linux!
+[2026-02-23 15:49:51] [CRITICAL]  9. RULE 9:  Competition user accounts are NEVER disabled!
+[2026-02-23 15:49:51] [CRITICAL] 10. RULE 7:  No subnet blocking - individual IPs only!
+[2026-02-23 15:49:51] [CRITICAL] 11. RULE 5:  DO NOT touch /greyteam_key or any greyteam file!
+[2026-02-23 15:49:51] [CRITICAL] 12. RULE 15: /greyteam_key presence = Red Team tools authorized!
+[2026-02-23 15:49:51] [WARNING] 13. WATCH /var/log/auth.log for Red Team SSH attempts
+[2026-02-23 15:49:51] [WARNING] 14. MONITOR: ausearch -k priv_escalation | tail -50
+[2026-02-23 15:49:51] [WARNING] 15. REVIEW backdoor report: /var/log/blueteam/backdoor_report_*.txt
+[2026-02-23 15:49:51] [WARNING] 16. WATCH for re-appearing cron jobs or new user accounts
+[2026-02-23 15:49:51] [WARNING] 17. CHECK /etc/hosts wasn't tampered with (DNS poisoning)
+[2026-02-23 15:49:51] [WARNING] 18. DOCUMENT all actions - needed for inject (friendship lesson) responses!
+[2026-02-23 15:49:51] [WARNING] 19. RUN this script periodically to maintain security posture
+[2026-02-23 15:49:51] [WARNING] 20. REVERT budget (Rule 16): Up to 3 hosts/day can be reverted
+[2026-02-23 15:49:51] [INFO] 
+[2026-02-23 15:49:51] [INFO] ============================================================
+[2026-02-23 15:49:51] [SUCCESS] HARDENING COMPLETE - SYSTEM READY FOR COMPETITION
+[2026-02-23 15:49:51] [INFO] ============================================================
+
+================================================================================
+                    BLUE TEAM HARDENING COMPLETE
+================================================================================
+
+Script Run #:      #1
+Operator:          cyberrange
+Log File:          /var/log/blueteam/SecureNix_20260223_154800.log
+Backdoor Report:   /var/log/blueteam/backdoor_report_20260223_154944.txt
+Changes Applied:   33
+Accounts Locked:   0
+Passwords Changed: 0 / 3 (Rule 14)
+Security Issues:   2 - REVIEW IMMEDIATELY!
+
+================================================================================
+
+[2026-02-23 15:49:51] [CRITICAL] Initiating system reboot: First run - reboot required to apply all kernel/mount/auditd changes
+
+First run - reboot required to apply all kernel/mount/auditd changes
+
+Rebooting in  6 seconds... (Ctrl+C to cancel)^C
