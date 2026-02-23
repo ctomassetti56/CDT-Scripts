@@ -16,14 +16,10 @@
     **REQUIRED CONFIGURATION - EDIT THESE VARIABLES:**
     
     1. $AuthorizedAdmins - Add your blue team usernames
-       Example: @("blueteam1", "blueteam2", "blueteam3")
     
     2. $SetAllUserPasswords - Change to YOUR secure password @(line 247)
-       Example: "YourTeamPassword2026!Secure"
-       NOTE: Avoid using # symbol - use ! @ $ % ^ & * instead
     
     3. $SafeIPAddresses - Verify scoring engine/jumpbox IPs
-       (Default values should work for CDT competition)
     
     **OPTIONAL:** Review $SafeUsers to ensure all competition users are protected
     
@@ -193,9 +189,9 @@ if ($All -or $noArgs) {
 $SafeUsers = @(
     # Windows Default Users
     "Administrator",
-    "DefaultAccount",
-    "Guest",
-    "WDAGUtilityAccount",
+    "DefaultAccount", # should be disabled (if not disable it)
+    "Guest", # should be disabled (if not disable it)
+    "WDAGUtilityAccount", # should be disabled (if not disable it)
     
     # Local Users (from competition packet)
     "twilight",
@@ -229,13 +225,14 @@ $SafeUsers = @(
     "greyteam",
     "grayteam",
     "gray_team",
-    "grey_team"
+    "grey_team",
+    "scoring" # Added scoring user to ensure scoring is not interupted
 )
 
 # List of users that should have admin access and password reset
 # These are YOUR blue team users - add them here
 $AuthorizedAdmins = @(
-    "blueadmin1"
+    "blueadmin"
     # Add your blue team members here
 )
 
@@ -244,7 +241,7 @@ $AuthorizedAdmins = @(
 # NOTE: Use only these special characters: ! @ $ % ^ & * ( ) - _ = + [ ] { } ; : , . ?
 # The # symbol can cause issues with Windows password complexity
 
-$SetAllUserPasswords = "FriendshipIsMagic0!" # CHANGE THIS PASSWORD SO ITS NOT THE DEFAULT
+$SetAllUserPasswords = "CharlieBlueSecure1010!" # DO NOT SHARE THIS PASSWORD WITH ANYONE!
 
 # NETWORK SECURITY - CDT Competition Network
 # IP addresses that should NEVER be blocked (scoring engine, gray team, jumpboxes)
@@ -332,7 +329,7 @@ $AccountLockoutDuration = 30             # Lockout duration in minutes
 # SYSTEM HARDENING
 $DisableSMBv1 = $true                    # Disable SMBv1 (critical!)
 $DisableRDP = $false                     # CRITICAL: Per Rule 10 - CANNOT disable RDP!
-$EnableWindowsDefender = $false           # Disable Windows Defender
+$EnableWindowsDefender = $false           # Disable Windows Defender - enable is not allowed!
 $DisableUSBStorage = $false              # Disable USB storage devices
 $DisablePowerShellV2 = $true             # Disable PowerShell v2
 
