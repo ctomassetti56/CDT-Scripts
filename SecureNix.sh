@@ -219,7 +219,7 @@ SAFE_USERS=(
 
     # === BLUE TEAM ADMIN ACCOUNTS ===
     # *** ADD YOUR BLUE TEAM USERNAMES HERE ***
-    "blueteam"
+    "blueadmin"
 )
 
 # All competition-packet users (used for password changes)
@@ -233,8 +233,7 @@ COMP_USERS=(
 # Blue team members (accounts YOU control - keep their authorized_keys!)
 # *** EDIT THIS LIST WITH YOUR ACTUAL BLUE TEAM USERNAMES ***
 AUTHORIZED_ADMINS=(
-    "blueteam"
-    "celestia"
+    "blueadmin"
 )
 
 # ---------------------------------------------------------------------------
@@ -243,7 +242,7 @@ AUTHORIZED_ADMINS=(
 # CRITICAL: Update on the SCORING PORTAL FIRST (Rule 14 - max 3 changes/host)
 # Default from packet: Friendship0!
 # ---------------------------------------------------------------------------
-SET_ALL_USER_PASSWORDS="<CHANGE-THIS-BEFORE-RUNNING>"   # <--- CHANGE ME
+SET_ALL_USER_PASSWORDS="MyLittlePonySucks1!"   # <--- CHANGE ME
 
 # ---------------------------------------------------------------------------
 # SAFE IP ADDRESSES - Scoring engine, jumpboxes, competition infrastructure
