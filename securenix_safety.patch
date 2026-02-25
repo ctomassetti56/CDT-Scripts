@@ -1,0 +1,594 @@
+*** SecureNix.sh.orig	2026-02-25
+--- SecureNix.sh	2026-02-25
+***************
+*** 1,10 ****
+  #!/usr/bin/env bash
+  # ==============================================================================
+  # SecureNix.sh - Linux Hardening Script
+  # Blue Team Hardening Script for CDT Competition - Team Charlie Spring 2026
+  # ==============================================================================
+--- 1,10 ----
+  #!/usr/bin/env bash
+  # ==============================================================================
+  # SecureNix.sh - Linux Hardening Script
+  # Blue Team Hardening Script for CDT Competition - Team Charlie Spring 2026
+  # ==============================================================================
+***************
+*** 86,106 ****
+  # OPTIONS:
+  #   --help           Display this help menu
+  #   --all            Run ALL phases (same as no args)
+  #   --phase1         User Account Management (interactive)
+  #   --phase2         Password Policy Hardening (PAM)
+  #   --phase3         Firewall Hardening - UFW (service selector)
+  #   --phase4         SSH Hardening (NEVER disable - Rule 10!)
+  #   --phase5         Network Security (sysctl, disable bad services)
+  #   --phase6         Backdoor Detection
+  #   --phase7         System Hardening (AppArmor, perms, mounts)
+  #   --phase8         Audit Logging (auditd)
+  #   --phases N,M,... Run selected phases (e.g., --phases 1,3,8)
+--- 86,114 ----
+  # OPTIONS:
+  #   --help           Display this help menu
+  #   --all            Run ALL phases (same as no args)
+  #   --phase1         User Account Management (interactive)
+  #   --phase2         Password Policy Hardening (PAM)
+  #   --phase3         Firewall Hardening - UFW (service selector)
+  #   --phase4         SSH Hardening (NEVER disable - Rule 10!)
+  #   --phase5         Network Security (sysctl, disable bad services)
+  #   --phase6         Backdoor Detection
+  #   --phase7         System Hardening (AppArmor, perms, mounts)
+  #   --phase8         Audit Logging (auditd)
+  #   --phases N,M,... Run selected phases (e.g., --phases 1,3,8)
++ #   --strict-firewall     Firewall allow ONLY from MGMT + SAFE_IPs (DEFAULT)
++ #   --open-firewall       Open scored ports to the world (NOT recommended)
++ #   --force-ufw-reset     Reset UFW to clean slate before applying rules
++ #   --strict-ssh-whitelist Enable AllowUsers whitelist in sshd_config
++ #   --no-reboot           Never reboot automatically (still prints recommendation)
+***************
+*** 122,131 ****
+  set -uo pipefail
+  
+  # ==============================================================================
+  # ROOT CHECK
+  # ==============================================================================
+--- 130,153 ----
+  set -uo pipefail
+  
++ # ==============================================================================
++ # GLOBAL SAFETY DEFAULTS (competition-safe)
++ # ==============================================================================
++ FIREWALL_MODE="STRICT"       # STRICT=only allow from SAFE ranges; OPEN=ports open to all
++ FORCE_UFW_RESET=false
++ STRICT_SSH_ALLOWUSERS=false
++ NO_REBOOT=false
++ ENABLE_TCP_WRAPPERS=false   # default OFF (libwrap is unreliable on modern daemons)
++ 
+  # ==============================================================================
+  # ROOT CHECK
+  # ==============================================================================
+***************
+*** 146,156 ****
+  RUN_PHASE5=false; RUN_PHASE6=false; RUN_PHASE7=false; RUN_PHASE8=false
+  RUNNING_INDIVIDUAL_PHASE=false
+  SELECTED_PHASES=()
+  
+  show_help() {
+--- 168,191 ----
+  RUN_PHASE5=false; RUN_PHASE6=false; RUN_PHASE7=false; RUN_PHASE8=false
+  RUNNING_INDIVIDUAL_PHASE=false
+  SELECTED_PHASES=()
+  
+  show_help() {
+***************
+*** 170,180 ****
+      echo "    --phase7        System Hardening           - AppArmor, permissions, mounts!"
+      echo "    --phase8        Audit Logging (auditd)     - Full auditd rule set!"
+      echo "    --phases N,...  Run selected phases        - e.g., --phases 1,3,8"
+      echo ""
+      echo "DEFAULT:"
+--- 205,223 ----
+      echo "    --phase7        System Hardening           - AppArmor, permissions, mounts!"
+      echo "    --phase8        Audit Logging (auditd)     - Full auditd rule set!"
+      echo "    --phases N,...  Run selected phases        - e.g., --phases 1,3,8"
++     echo ""
++     echo "SAFETY OPTIONS:"
++     echo "    --strict-firewall        Allow scored ports ONLY from MGMT_SUBNET + SAFE_IPs (default)"
++     echo "    --open-firewall          Open scored ports globally (not recommended)"
++     echo "    --force-ufw-reset        Reset UFW before applying new rules"
++     echo "    --strict-ssh-whitelist   Enable AllowUsers whitelist in sshd_config (inject-risky)"
++     echo "    --no-reboot              Never reboot automatically"
+      echo ""
+      echo "DEFAULT:"
+***************
+*** 207,214 ****
+          case "$1" in
+              --help|-h)   show_help ;;
+              --all)
+                  RUN_PHASE1=true; RUN_PHASE2=true; RUN_PHASE3=true; RUN_PHASE4=true
+                  RUN_PHASE5=true; RUN_PHASE6=true; RUN_PHASE7=true; RUN_PHASE8=true
+                  SELECTED_PHASES=(1 2 3 4 5 6 7 8)
+                  ;;
+--- 250,277 ----
+          case "$1" in
+              --help|-h)   show_help ;;
+              --all)
+                  RUN_PHASE1=true; RUN_PHASE2=true; RUN_PHASE3=true; RUN_PHASE4=true
+                  RUN_PHASE5=true; RUN_PHASE6=true; RUN_PHASE7=true; RUN_PHASE8=true
+                  SELECTED_PHASES=(1 2 3 4 5 6 7 8)
+                  ;;
++             --strict-firewall) FIREWALL_MODE="STRICT" ;;
++             --open-firewall)   FIREWALL_MODE="OPEN" ;;
++             --force-ufw-reset) FORCE_UFW_RESET=true ;;
++             --strict-ssh-whitelist) STRICT_SSH_ALLOWUSERS=true ;;
++             --no-reboot) NO_REBOOT=true ;;
+              --phase1)    PARSED_PHASES+=(1) ;;
+              --phase2)    PARSED_PHASES+=(2) ;;
+              --phase3)    PARSED_PHASES+=(3) ;;
+***************
+*** 410,418 ****
+  # --- 1e: Audit and REMEDIATE sudo privileges ---------------------------------
+  log "Auditing and remediating sudo configuration..." "INFO"
+  SUDOERS_ISSUES_FOUND=0
+  
+  # Helper: remove or comment out a NOPASSWD line from a sudoers file
+--- 473,492 ----
+  # --- 1e: Audit and REMEDIATE sudo privileges ---------------------------------
+  log "Auditing and remediating sudo configuration..." "INFO"
+  SUDOERS_ISSUES_FOUND=0
+  
++ # SAFETY: only auto-remediate NOPASSWD if the target is a NON-safe user.
++ # Packet users/groups might legitimately have NOPASSWD for scoring/ops; we flag those only.
++ sudoers_line_target_is_safe() {
++     local line="$1"
++     local first; first=$(echo "$line" | awk '{print $1}')
++     [[ -z "$first" ]] && return 0
++     [[ "$first" =~ ^% ]] && return 0   # groups: flag-only
++     is_safe_user "$first" && return 0
++     return 1
++ }
++ 
+  # Helper: remove or comment out a NOPASSWD line from a sudoers file
+***************
+*** 458,470 ****
+          if echo "$line" | grep -qE 'NOPASSWD'; then
+              log "NOPASSWD FOUND in /etc/sudoers: $line" "CRITICAL"
+              add_security_issue "NOPASSWD sudo in /etc/sudoers: $line"
+              log "  Attempting auto-remediation..." "WARNING"
+              remediate_sudoers_nopasswd "/etc/sudoers" "$line"
+          fi
+      done < /etc/sudoers
+  fi
+--- 532,551 ----
+          if echo "$line" | grep -qE 'NOPASSWD'; then
+              log "NOPASSWD FOUND in /etc/sudoers: $line" "CRITICAL"
+              add_security_issue "NOPASSWD sudo in /etc/sudoers: $line"
++             if sudoers_line_target_is_safe "$line"; then
++                 log "  SAFE TARGET detected (packet user or group). Flagging only; no auto-remediation." "WARNING"
++             else
+                  log "  Attempting auto-remediation..." "WARNING"
+                  remediate_sudoers_nopasswd "/etc/sudoers" "$line"
++             fi
+          fi
+      done < /etc/sudoers
+  fi
+***************
+*** 487,500 ****
+              if echo "$line" | grep -qE 'NOPASSWD'; then
+                  log "NOPASSWD FOUND in $sf: $line" "CRITICAL"
+                  add_security_issue "NOPASSWD sudo in $sf: $line"
+                  log "  Attempting auto-remediation..." "WARNING"
+                  remediate_sudoers_nopasswd "$sf" "$line"
+              fi
+          done < "$sf"
+      done
+  fi
+--- 568,588 ----
+              if echo "$line" | grep -qE 'NOPASSWD'; then
+                  log "NOPASSWD FOUND in $sf: $line" "CRITICAL"
+                  add_security_issue "NOPASSWD sudo in $sf: $line"
++                 if sudoers_line_target_is_safe "$line"; then
++                     log "  SAFE TARGET detected (packet user or group). Flagging only; no auto-remediation." "WARNING"
++                 else
+                      log "  Attempting auto-remediation..." "WARNING"
+                      remediate_sudoers_nopasswd "$sf" "$line"
++                 fi
+              fi
+          done < "$sf"
+      done
+  fi
+***************
+*** 640,647 ****
+  log "Ensuring libpam-pwquality is installed..." "INFO"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-pwquality 2>/dev/null | \
+      grep -E "install|upgraded" | while IFS= read -r l; do log "$l" "INFO"; done || true
+  fi
+--- 728,748 ----
+  log "Ensuring libpam-pwquality is installed..." "INFO"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-pwquality 2>/dev/null | \
+      grep -E "install|upgraded" | while IFS= read -r l; do log "$l" "INFO"; done || true
+  fi
++ 
++ # Warn if pam_pwquality is not actually enabled in PAM stack
++ if [[ -f /etc/pam.d/common-password ]]; then
++     if ! grep -qE 'pam_pwquality\.so' /etc/pam.d/common-password 2>/dev/null; then
++         log "WARNING: pam_pwquality.so not found in /etc/pam.d/common-password." "WARNING"
++         log "pwquality.conf may not be enforced unless PAM stack includes pam_pwquality." "WARNING"
++         add_security_issue "pam_pwquality not enabled in common-password (policy may not enforce)"
++     fi
++ fi
+***************
+*** 712,742 ****
+  # Backup current iptables state
+  iptables-save  > "$LOG_DIR/iptables_backup_$(date +%s).rules"  2>/dev/null || true
+  ip6tables-save > "$LOG_DIR/ip6tables_backup_$(date +%s).rules" 2>/dev/null || true
+  log "iptables rules backed up to $LOG_DIR" "INFO"
+  
+  # --- 3a: Interactive service port selector -----------------------------------
+--- 813,858 ----
+  # Backup current iptables state
+  iptables-save  > "$LOG_DIR/iptables_backup_$(date +%s).rules"  2>/dev/null || true
+  ip6tables-save > "$LOG_DIR/ip6tables_backup_$(date +%s).rules" 2>/dev/null || true
+  log "iptables rules backed up to $LOG_DIR" "INFO"
++ 
++ # Safety: do not reset UFW unless explicitly requested
++ if $FORCE_UFW_RESET; then
++     log "FORCE_UFW_RESET enabled: Resetting UFW for clean configuration..." "WARNING"
++     ufw --force reset 2>/dev/null || true
++ else
++     log "UFW reset skipped (safer). Use --force-ufw-reset if you truly need a clean slate." "INFO"
++ fi
+  
+  # --- 3a: Interactive service port selector -----------------------------------
+***************
+*** 800,809 ****
+  log "Resetting UFW for clean configuration..." "INFO"
+  ufw --force reset 2>/dev/null || true
+  
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw default deny forward
+--- 916,928 ----
++ # Set baseline policies
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw default deny forward
+***************
+*** 812,832 ****
+  # --- SSH FIRST (CRITICAL - Rule 10) -----------------------------------------
+  log "Opening SSH (port 22) - REQUIRED by Rule 10..." "INFO"
+  ufw allow 22/tcp comment 'SSH - Rule 10 required'
+  ufw limit ssh    # Rate limiting to slow brute force
+  add_change "Firewall" "SSH allowed + rate-limited (Rule 10)" "SUCCESS" "port 22/tcp"
+  
+  # --- Always-open ports (scoring engine access) -------------------------------
+  log "Opening scoring portal ports (always required)..." "INFO"
+  ufw allow 443/tcp comment 'HTTPS - Scoring portal'
+  ufw allow 444/tcp comment 'Scoring engine netcat'
+  add_change "Firewall" "Scoring engine ports opened" "SUCCESS" "443, 444"
+--- 931,1007 ----
+  # --- SSH FIRST (CRITICAL - Rule 10) -----------------------------------------
+- log "Opening SSH (port 22) - REQUIRED by Rule 10..." "INFO"
+- ufw allow 22/tcp comment 'SSH - Rule 10 required'
+- ufw limit ssh    # Rate limiting to slow brute force
+- add_change "Firewall" "SSH allowed + rate-limited (Rule 10)" "SUCCESS" "port 22/tcp"
+- 
+- # --- Always-open ports (scoring engine access) -------------------------------
+- log "Opening scoring portal ports (always required)..." "INFO"
+- ufw allow 443/tcp comment 'HTTPS - Scoring portal'
+- ufw allow 444/tcp comment 'Scoring engine netcat'
+- add_change "Firewall" "Scoring engine ports opened" "SUCCESS" "443, 444"
++ # FIREWALL MODE:
++ # STRICT (default): allow required ports ONLY from MGMT_SUBNET + SAFE_IP_ADDRESSES
++ # OPEN: allow required ports globally (less secure; use only if scoring requires)
++ log "Firewall mode: $FIREWALL_MODE" "WARNING"
++ 
++ allow_port_strict() {
++     local port="$1" proto="$2" comment="$3"
++     # Always allow from mgmt subnet (Grey Team + jump infra)
++     ufw allow from "$MGMT_SUBNET" to any port "$port" proto "$proto" comment "$comment" 2>/dev/null || true
++     # Allow from each safe IP individually
++     for ip in "${SAFE_IP_ADDRESSES[@]}"; do
++         [[ "$ip" == "127.0.0.1" || "$ip" == "::1" ]] && continue
++         ufw allow from "$ip" to any port "$port" proto "$proto" comment "$comment" 2>/dev/null || true
++     done
++ }
++ 
++ allow_port_open() {
++     local port="$1" proto="$2" comment="$3"
++     ufw allow "$port/$proto" comment "$comment" 2>/dev/null || true
++ }
++ 
++ # SSH must be reachable (Rule 10). In STRICT mode, only mgmt + safe IPs can SSH.
++ if [[ "$FIREWALL_MODE" == "OPEN" ]]; then
++     log "Allowing SSH globally (OPEN mode)..." "WARNING"
++     allow_port_open 22 tcp "SSH - Rule 10 required"
++     ufw limit 22/tcp comment 'SSH rate limit' 2>/dev/null || true
++ else
++     log "Allowing SSH only from MGMT_SUBNET + SAFE_IPs (STRICT mode)..." "INFO"
++     allow_port_strict 22 tcp "SSH - Rule 10 required (strict)"
++     # UFW 'limit' can be global; in strict mode we rely on source restriction.
++ fi
++ add_change "Firewall" "SSH allowed (Rule 10)" "SUCCESS" "mode=$FIREWALL_MODE"
++ 
++ # Scoring ports (443, 444)
++ if [[ "$FIREWALL_MODE" == "OPEN" ]]; then
++     log "Allowing scoring ports globally (OPEN mode)..." "WARNING"
++     allow_port_open 443 tcp "HTTPS - Scoring portal"
++     allow_port_open 444 tcp "Scoring engine netcat"
++ else
++     log "Allowing scoring ports only from MGMT_SUBNET + SAFE_IPs (STRICT mode)..." "INFO"
++     allow_port_strict 443 tcp "HTTPS - Scoring portal (strict)"
++     allow_port_strict 444 tcp "Scoring engine netcat (strict)"
++ fi
++ add_change "Firewall" "Scoring ports allowed" "SUCCESS" "443,444 mode=$FIREWALL_MODE"
+***************
+*** 835,865 ****
+  # --- Service-specific ports --------------------------------------------------
+  if [[ ${#SERVICE_PORTS[@]} -gt 0 ]]; then
+      log "Opening service-specific ports for: $SERVICE_NAME" "INFO"
+      for port in "${SERVICE_PORTS[@]}"; do
+-         ufw allow "${port}/tcp" comment "$SERVICE_NAME"
+-         # CUPS also needs UDP
+-         if [[ "$svc_choice" == "3" && "$port" == "631" ]]; then
+-             ufw allow "${port}/udp" comment "CUPS UDP"
+-         fi
+-         log "  Opened port $port/tcp for $SERVICE_NAME" "SUCCESS"
++         if [[ "$FIREWALL_MODE" == "OPEN" ]]; then
++             allow_port_open "$port" tcp "$SERVICE_NAME"
++             log "  Opened port $port/tcp globally for $SERVICE_NAME (OPEN mode)" "WARNING"
++         else
++             allow_port_strict "$port" tcp "$SERVICE_NAME (strict)"
++             log "  Opened port $port/tcp only from MGMT+SAFE_IPs for $SERVICE_NAME (STRICT mode)" "SUCCESS"
++         fi
++ 
++         # CUPS also needs UDP
++         if [[ "$svc_choice" == "3" && "$port" == "631" ]]; then
++             if [[ "$FIREWALL_MODE" == "OPEN" ]]; then
++                 allow_port_open "$port" udp "CUPS UDP"
++             else
++                 allow_port_strict "$port" udp "CUPS UDP (strict)"
++             fi
++         fi
+      done
+      add_change "Firewall" "Service ports opened" "SUCCESS" "${SERVICE_PORTS[*]}"
+  else
+      log "No service-specific ports to open for: $SERVICE_NAME" "INFO"
+  fi
+  
+- # --- Whitelist individual competition infrastructure IPs --------------------
+- log "Whitelisting individual competition infrastructure IPs..." "INFO"
+- for ip in "${SAFE_IP_ADDRESSES[@]}"; do
+-     # Skip loopback (UFW handles that natively)
+-     [[ "$ip" == "127.0.0.1" || "$ip" == "::1" ]] && continue
+-     ufw allow from "$ip" to any comment "Competition infrastructure" 2>/dev/null || \
+-         log "  Could not add UFW rule for $ip" "WARNING"
+- done
+- add_change "Firewall" "Safe IPs whitelisted" "SUCCESS" "${#SAFE_IP_ADDRESSES[@]} IPs"
+- 
+- # --- Whitelist entire management subnet for Grey Team -----------------------
+- log "Whitelisting management subnet $MGMT_SUBNET for Grey Team access..." "INFO"
+- ufw allow from "$MGMT_SUBNET" to any comment "Grey Team mgmt subnet - ALLOW per Rule 7"
+- add_change "Firewall" "Grey Team mgmt subnet allowed" "SUCCESS" "$MGMT_SUBNET"
+- log "  Grey Team can access from any IP in $MGMT_SUBNET" "SUCCESS"
++ # Note: In STRICT mode, whitelisting is done per-port above. We do NOT add
++ # broad "allow from IP to any" rules (that defeats the point of strict mode).
++ if [[ "$FIREWALL_MODE" == "OPEN" ]]; then
++     log "OPEN mode: no per-IP whitelisting is applied; ports are globally open." "WARNING"
++ else
++     log "STRICT mode: ports are restricted to MGMT_SUBNET + SAFE_IPs (per-port rules)." "INFO"
++     add_change "Firewall" "Strict whitelist active" "SUCCESS" "MGMT_SUBNET + SAFE_IPs (per-port)"
++ fi
+***************
+*** 936,979 ****
+-     # Build AllowUsers: packet users + blue team admins + greyteam (REQUIRED) + operator
+-     # CRITICAL: greyteam MUST be in AllowUsers - it's not in the packet but it IS a
+-     # real system user. AllowUsers is a strict whitelist: anyone not listed is locked
+-     # out of SSH entirely. The operator is also always included (self-lockout protection).
+-     ALL_SSH_USERS=$(printf '%s\n' \
+-         "${COMP_USERS[@]}" \
+-         "${AUTHORIZED_ADMINS[@]}" \
+-         "greyteam" \
+-         "grayteam" \
+-         "grey_team" \
+-         "gray_team" \
+-         "scoring" \
+-         "$CURRENT_OPERATOR" \
+-         | sort -u | tr '\n' ' ' | sed 's/ $//')
+-     set_ssh_opt "AllowUsers" "$ALL_SSH_USERS"
+-     log "AllowUsers set to: $ALL_SSH_USERS" "INFO"
+-     log "  NOTE: greyteam explicitly included (not in packet but required for infra access)." "INFO"
+-     log "  NOTE: $CURRENT_OPERATOR explicitly included (self-lockout protection)." "INFO"
++     # AllowUsers is OPTIONAL because it can break injects/domain formats.
++     # If enabled, we also use an include file so you can add users safely without editing script.
++     if $STRICT_SSH_ALLOWUSERS; then
++         log "STRICT SSH whitelist ENABLED: configuring AllowUsers." "WARNING"
++         mkdir -p /etc/ssh 2>/dev/null || true
++         touch /etc/ssh/allowusers.extra 2>/dev/null || true
++         chmod 644 /etc/ssh/allowusers.extra 2>/dev/null || true
++ 
++         ALL_SSH_USERS=$(printf '%s\n' \
++             "${COMP_USERS[@]}" \
++             "${AUTHORIZED_ADMINS[@]}" \
++             "greyteam" \
++             "grayteam" \
++             "grey_team" \
++             "gray_team" \
++             "$CURRENT_OPERATOR" \
++             | sort -u | tr '\n' ' ' | sed 's/ $//')
++ 
++         set_ssh_opt "AllowUsers" "$ALL_SSH_USERS"
++         log "AllowUsers set to baseline: $ALL_SSH_USERS" "INFO"
++         log "To allow additional users (injects/domain), add to: /etc/ssh/allowusers.extra" "WARNING"
++ 
++         # Ensure sshd includes extra file if supported
++         if ! grep -qE '^[[:space:]]*Include[[:space:]]+/etc/ssh/allowusers\.extra' "$SSHD_CONFIG" 2>/dev/null; then
++             echo "Include /etc/ssh/allowusers.extra" >> "$SSHD_CONFIG"
++         fi
++     else
++         log "STRICT SSH whitelist disabled: not setting AllowUsers (safer for injects)." "INFO"
++     fi
+***************
+*** 1148,1166 ****
+- log "Configuring TCP Wrappers..." "INFO"
+- log "  Grey Team mgmt subnet $MGMT_SUBNET will be whitelisted in addition to individual IPs." "INFO"
+- cp /etc/hosts.deny  "/etc/hosts.deny.bak.$(date +%s)"   2>/dev/null || true
+- cp /etc/hosts.allow "/etc/hosts.allow.bak.$(date +%s)"  2>/dev/null || true
+- 
+- cat > /etc/hosts.deny << 'DENY'
+- # SecureNix CDT Team Charlie - Deny all by default
+- # Rule 7: This denies unknown hosts. ALLOWing ranges in hosts.allow is not a subnet block.
+- ALL: ALL
+- DENY
+- 
+- {
+-     echo "# SecureNix CDT Team Charlie - Whitelist: mgmt subnet + individual competition IPs"
+-     echo ""
+-     echo "# Loopback"
+-     echo "ALL: 127.0.0.1"
+-     echo "ALL: ::1"
+-     echo ""
+-     echo "# Full management subnet (172.20.0.0/24) - Grey Team may jump from any IP here."
+-     echo "# Rule 7 forbids BLOCKING subnets - this ALLOW rule is explicitly permitted."
+-     echo "ALL: 172.20.0.0/255.255.255.0"
+-     echo ""
+-     echo "# Individual competition infrastructure IPs"
+-     for ip in "${SAFE_IP_ADDRESSES[@]}"; do
+-         [[ "$ip" == "127.0.0.1" || "$ip" == "::1" ]] && continue
+-         echo "ALL: $ip"
+-     done
+- } > /etc/hosts.allow
+- 
+- add_change "Network" "TCP Wrappers configured" "SUCCESS" "deny all; allow $MGMT_SUBNET + individual IPs"
+- log "TCP Wrappers configured. Management subnet $MGMT_SUBNET whitelisted for Grey Team." "SUCCESS"
++ if $ENABLE_TCP_WRAPPERS; then
++     log "Configuring TCP Wrappers (OPTIONAL)..." "WARNING"
++     log "Note: many modern services ignore libwrap; UFW is the real control." "WARNING"
++     cp /etc/hosts.deny  "/etc/hosts.deny.bak.$(date +%s)"   2>/dev/null || true
++     cp /etc/hosts.allow "/etc/hosts.allow.bak.$(date +%s)"  2>/dev/null || true
++ 
++     cat > /etc/hosts.deny << 'DENY'
++ # SecureNix CDT Team Charlie - Deny all by default (libwrap-enabled daemons only)
++ ALL: ALL
++ DENY
++ 
++     {
++         echo "# SecureNix CDT Team Charlie - Whitelist: mgmt subnet + individual competition IPs"
++         echo ""
++         echo "ALL: 127.0.0.1"
++         echo "ALL: ::1"
++         echo "ALL: 172.20.0.0/255.255.255.0"
++         for ip in "${SAFE_IP_ADDRESSES[@]}"; do
++             [[ "$ip" == "127.0.0.1" || "$ip" == "::1" ]] && continue
++             echo "ALL: $ip"
++         done
++     } > /etc/hosts.allow
++ 
++     add_change "Network" "TCP Wrappers configured" "SUCCESS" "optional enable"
++ else
++     log "TCP Wrappers skipped (default). Use UFW for real enforcement." "INFO"
++ fi
+***************
+*** 1370,1390 ****
+- # --- 7f: Restrict compiler access -------------------------------------------
+- log "Restricting compiler execute permissions for others..." "INFO"
+- for comp in /usr/bin/gcc /usr/bin/g++ /usr/bin/cc /usr/bin/make /usr/bin/python3; do
+-     [[ -f "$comp" ]] && chmod o-x "$comp" 2>/dev/null && \
+-         log "  Restricted execute for others: $comp" "INFO" || true
+- done
+- add_change "SystemHardening" "Compiler access restricted for others" "SUCCESS" ""
++ # --- 7f: Restrict compiler access (SAFE VERSION) ----------------------------
++ # Do NOT touch python3 in competitions; it can break system tooling and services.
++ log "Optional: restricting compiler execute permissions for others (excluding python3)..." "INFO"
++ for comp in /usr/bin/gcc /usr/bin/g++ /usr/bin/cc /usr/bin/make; do
++     [[ -f "$comp" ]] && chmod o-x "$comp" 2>/dev/null && \
++         log "  Restricted execute for others: $comp" "INFO" || true
++ done
++ add_change "SystemHardening" "Compiler restriction applied (no python3)" "SUCCESS" ""
+***************
+*** 1415,1439 ****
+- # --- 7i: Remove offensive security tools ------------------------------------
+- log "Removing offensive security tools if present..." "INFO"
+- REMOVE_DANGEROUS=(
+-     "nmap" "masscan" "hydra" "john" "hashcat"
+-     "aircrack-ng" "wireshark" "metasploit-framework"
+-     "netcat-traditional" "netcat-openbsd"
+- )
+- for pkg in "${REMOVE_DANGEROUS[@]}"; do
+-     if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
+-         DEBIAN_FRONTEND=noninteractive apt-get remove -y "$pkg" 2>/dev/null && \
+-             log "  Removed offensive tool: $pkg" "SUCCESS" || \
+-             log "  Could not remove: $pkg" "WARNING"
+-         add_change "SystemHardening" "Remove offensive tool" "SUCCESS" "$pkg"
+-     fi
+- done
++ # --- 7i: Offensive tools (FLAG ONLY BY DEFAULT) -----------------------------
++ # Removing packages can break scoring dependencies and your own troubleshooting.
++ log "Flagging offensive tools if present (no auto-removal by default)..." "INFO"
++ FLAG_TOOLS=("nmap" "masscan" "hydra" "john" "hashcat" "aircrack-ng" "wireshark" "metasploit-framework")
++ for pkg in "${FLAG_TOOLS[@]}"; do
++     if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
++         log "Offensive tool present: $pkg (flagged; not removed)" "WARNING"
++         add_security_issue "Offensive tool installed: $pkg"
++     fi
++ done
+***************
+*** 1904,1964 ****
+- # Smart reboot logic
+- SHOULD_REBOOT=false
+- REBOOT_REASON=""
+- 
+- if [[ $SCRIPT_RUN_COUNT -eq 1 ]]; then
+-     SHOULD_REBOOT=true
+-     REBOOT_REASON="First run - reboot required to apply all kernel/mount/auditd changes"
+- elif [[ $CHANGES_COUNT -ge 5 ]]; then
+-     SHOULD_REBOOT=true
+-     REBOOT_REASON="Significant changes applied ($CHANGES_COUNT total) - reboot recommended"
+- else
+-     echo -e "${C_YELLOW}This is run #$SCRIPT_RUN_COUNT with $CHANGES_COUNT change(s) applied.${C_RESET}"
+-     echo -e "${C_YELLOW}Most settings are already configured - a reboot may not be necessary.${C_RESET}"
+-     echo ""
+-     read -rp "$(echo -e "${C_CYAN}Do you want to reboot now? (y/N): ${C_RESET}")" reboot_choice
+-     if [[ "${reboot_choice,,}" == "y" ]]; then
+-         SHOULD_REBOOT=true
+-         REBOOT_REASON="Manual reboot requested by operator"
+-     else
+-         echo ""
+-         echo -e "${C_YELLOW}Reboot skipped. Reboot later with: sudo reboot${C_RESET}"
+-         echo ""
+-         exit 0
+-     fi
+- fi
+- 
+- if $SHOULD_REBOOT; then
+-     log "Initiating system reboot: $REBOOT_REASON" "CRITICAL"
+-     echo ""
+-     echo -e "${C_YELLOW}$REBOOT_REASON${C_RESET}"
+-     echo ""
+-     for i in $(seq 10 -1 1); do
+-         printf "\r${C_YELLOW}Rebooting in ${C_RED}%2d${C_YELLOW} seconds... (Ctrl+C to cancel)${C_RESET}" "$i"
+-         sleep 1
+-     done
+-     echo ""
+-     echo -e "${C_RED}REBOOTING NOW...${C_RESET}"
+-     log "Reboot initiated." "CRITICAL"
+-     sleep 1
+-     reboot
+- fi
++ # Reboot logic (competition-safe): ALWAYS PROMPT, and allow --no-reboot
++ if $NO_REBOOT; then
++     log "--no-reboot set: skipping reboot." "WARNING"
++     echo -e "${C_YELLOW}Reboot skipped (--no-reboot). Apply changes later with: sudo reboot${C_RESET}"
++ else
++     echo ""
++     echo -e "${C_YELLOW}A reboot may be needed to apply kernel/mount/audit changes fully.${C_RESET}"
++     read -rp "$(echo -e "${C_CYAN}Reboot now? (y/N): ${C_RESET}")" reboot_choice
++     if [[ "${reboot_choice,,}" == "y" ]]; then
++         log "Operator approved reboot." "CRITICAL"
++         echo -e "${C_RED}REBOOTING...${C_RESET}"
++         reboot
++     else
++         log "Reboot skipped by operator." "WARNING"
++         echo -e "${C_YELLOW}Reboot skipped. Reboot later with: sudo reboot${C_RESET}"
++     fi
++ fi
