@@ -97,7 +97,7 @@ show_help() {
     echo "================================================================================"
     echo "                SecureNix.sh - Linux Hardening Script"
     echo "                CDT Team Alpha - Spring 2026 | FQDN: mlp.local"
-    echo "                Time to lock out the Legion... For good :)"
+    echo "                Time to lock out Red... For good :)"
     echo "================================================================================"
     echo ""
     echo "USAGE:"
@@ -205,7 +205,7 @@ SAFE_USERS=(
     # === GREY TEAM (infrastructure) - NOT in packet but MUST NEVER be touched ===
     # greyteam logs in via SSH to manage infrastructure. Any global change that
     # affects all users (AllowUsers, PAM, account locking) must preserve this account.
-    "greyteam"
+    "greyteam" "grayteam" "grey_team" "gray_team"
 
     # === SYSTEM / SERVICE ACCOUNTS (never touch these) ===
     "root" "daemon" "bin" "sys" "sync" "games" "man" "lp" "mail"
@@ -281,6 +281,16 @@ SAFE_IP_ADDRESSES=(
     "172.20.0.48"   # jumpblue8  | ExtIP: 100.65.3.215  | RustDesk: 506 287 610
     "172.20.0.49"   # jumpblue9  | ExtIP: 100.65.8.5    | RustDesk: 503 963 007
     "172.20.0.40"   # jumpblue10 | ExtIP: 100.65.2.107  | RustDesk: 519 436 120
+    "100.65.6.247"  # jumpblue1  | ExtIP: 100.65.6.247  | RustDesk: 507 549 506
+    "100.65.6.186"  # jumpblue2  | ExtIP: 100.65.6.186  | RustDesk: 514 264 008
+    "100.65.7.94"   # jumpblue3  | ExtIP: 100.65.7.94   | RustDesk: 515 186 532
+    "100.65.6.185"  # jumpblue4  | ExtIP: 100.65.6.185  | RustDesk: 513 810 519
+    "100.65.7.201"  # jumpblue5  | ExtIP: 100.65.7.201  | RustDesk: 503 969 997  [UPDATED - overrides packet]
+    "100.65.3.191"  # jumpblue6  | ExtIP: 100.65.3.191  | RustDesk: 199 067 4293
+    "100.65.6.2"    # jumpblue7  | ExtIP: 100.65.6.2    | RustDesk: 512 381 411
+    "100.65.3.215"  # jumpblue8  | ExtIP: 100.65.3.215  | RustDesk: 506 287 610
+    "100.65.8.5"    # jumpblue9  | ExtIP: 100.65.8.5    | RustDesk: 503 963 007
+    "100.65.2.107"  # jumpblue10 | ExtIP: 100.65.2.107  | RustDesk: 519 436 120
 
     # Core subnet scored hosts (10.0.10.0/24)
     "10.0.10.1"     # canterlot       - Windows Server 2022 - Active Directory
@@ -418,7 +428,7 @@ is_admin_user() {
 echo ""
 echo -e "${C_CYAN}================================================================================${C_RESET}"
 echo -e "${C_GREEN}           SecureNix.sh - Linux Hardening Script${C_RESET}"
-echo -e "${C_GREEN}           CDT Team Alpha - Spring 2026 | FQDN: mlp.local${C_RESET}"
+echo -e "${C_GREEN}           CDT Team Charlie - Spring 2026 | FQDN: mlp.local${C_RESET}"
 echo -e "${C_GREEN}           Time to lock out the Legion... For good :)${C_RESET}"
 echo -e "${C_CYAN}================================================================================${C_RESET}"
 echo -e "${C_YELLOW}  Host:        $HOSTNAME_VAL${C_RESET}"
@@ -1296,7 +1306,19 @@ else
 *******************************************************************************
      AUTHORIZED USERS ONLY - CDT Team Alpha Competition System
      All unauthorized access attempts are monitored and logged.
-     Legion of Doom: you will not pass!
+     Blue Team is watching you...
+     
+  ⠀⠀⠀⠀           ⠀⠀    ⠀ ⠀⢐⢠⣤⣄⡀⣧⣟⣿⣥⣼⣷⣾⣶⣶⣴⣶⣦⣬⣁⠀
+ ⠀⠀⠀⠀    ⠀⠀⠀⠀ ⠀ ⠀   ⣤⣠⣅⣶⣾⣿⣷⣿⣿⣿⡿⡿⠿⡿⠿⣿⡿⣿⣿⣿⣿⣿⣿⣿⣷⣾⣽⣲⡡⡀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀⡀⣀⣴⣾⣿⣿⣿⣿⣿⣿⣿⢿⠉⣡⣾⣶⣾⣿⣷⣿⣿⣮⣦⢫⡟⢿⣿⣿⣿⣿⣿⣿⣷⣧⣤⣦⢤⣀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⣠⣶⣷⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠎⢰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⡦⡷⣎⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣾⣏⣷⡄⣀⠀⡄⠀⠀⠀⠀⠀⠀
+     ⠀⣠⢦⢄⣤⣽⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠆⣼⣿⣼⣉⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣺⠾⣵⢦⣀⠀⠀
+⢺⠽⡇⣾⣹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⢬⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⢳⡿⣛⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢟⣿⣿⣜⣆⠀
+    ⠀ ⠉⠉⠉⠙⠻⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣹⡆⠚⢿⣿⣿⣿⢿⣿⣿⠻⠀⣀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣹⣏⠟⠉⠉
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠛⠻⡿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣭⣢⡏⠀⠀⠈⢠⣛⣰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⡺⠁⠀⠉⠀
+  ⠀⠀⠀⠀   ⠀⠀⠀  ⠀⠀⠀⠀  ⠀⠙⠛⠿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⡟⠀⠙⠀
+  ⠀⠀⠀⠀⠀      ⠀⠀⠀⠀   ⠀⠀⠀  ⠀⠈⠀⠃⢋⠛⠙⢿⠿⢻⡿⠿⡿⠿⠿⢿⣟⠋⠏⠀⠀⠉
+
 *******************************************************************************
 SSHDBAN
     chmod 644 /etc/ssh/banner 2>/dev/null || true
