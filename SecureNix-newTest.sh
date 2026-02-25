@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # SecureNix.sh - Linux Hardening Script
-# Blue Team Hardening Script for CDT Competition - Team Alpha Spring 2026
+# Blue Team Hardening Script for CDT Competition - Team Charlie Spring 2026
 # ==============================================================================
 #
 # SYNOPSIS:
@@ -16,7 +16,7 @@
 #   2. SET_ALL_USER_PASSWORDS - Change to YOUR secure password (~line 185)
 #   3. SAFE_IP_ADDRESSES   - Scoring engine/jumpbox IPs (pre-filled from packet)
 #
-# CRITICAL_RULES (CDT Team Alpha Spring 2026):
+# CRITICAL_RULES (CDT Team Charlie Spring 2026):
 #   Rule 5:  DO NOT modify any file with "greyteam" in its name
 #   Rule 7:  DO NOT BLOCK subnets - but ALLOWING a subnet range is fine!
 #   Rule 9:  DO NOT disable any valid user accounts listed in the packet
@@ -43,7 +43,7 @@
 #   whinnyapolis    (10.0.30.6)  Ubuntu 24.04 Workstation
 #
 # NOTES:
-#   Author:       CDT Team Alpha + Claude AI
+#   Author:       Christian Tomassetti + Claude AI
 #   Requires:     Bash 4+ and root (sudo) privileges
 #   Compatible:   Debian 13 (Trixie), Ubuntu 24.04 LTS
 #   Last Updated: 02/25/2026
@@ -96,7 +96,6 @@ show_help() {
     echo ""
     echo "================================================================================"
     echo "                SecureNix.sh - Linux Hardening Script"
-    echo "                CDT Team Alpha - Spring 2026 | FQDN: mlp.local"
     echo "                Time to lock out Red... For good :)"
     echo "================================================================================"
     echo ""
@@ -194,7 +193,7 @@ else
 fi
 
 # ==============================================================================
-# CRITICAL COMPETITION VARIABLES - CDT TEAM ALPHA SPRING 2026
+# CRITICAL COMPETITION VARIABLES - CDT TEAM Charlie SPRING 2026
 # *** EDIT THE SECTIONS MARKED BELOW BEFORE RUNNING ***
 # ==============================================================================
 
@@ -245,6 +244,14 @@ COMP_USERS=(
 # *** EDIT THIS LIST WITH YOUR ACTUAL BLUE TEAM USERNAMES ***
 AUTHORIZED_ADMINS=(
     "blueadmin"
+    "bigmac"
+    "mayormare"
+    "shiningarmor"
+    "cadance"
+    "celestia"
+    "discord"
+    "luna"
+    "starswirl"
 )
 
 # ---------------------------------------------------------------------------
@@ -428,8 +435,7 @@ is_admin_user() {
 echo ""
 echo -e "${C_CYAN}================================================================================${C_RESET}"
 echo -e "${C_GREEN}           SecureNix.sh - Linux Hardening Script${C_RESET}"
-echo -e "${C_GREEN}           CDT Team Charlie - Spring 2026 | FQDN: mlp.local${C_RESET}"
-echo -e "${C_GREEN}           Time to lock out the Legion... For good :)${C_RESET}"
+echo -e "${C_GREEN}           Time to lock out Red... For good :)${C_RESET}"
 echo -e "${C_CYAN}================================================================================${C_RESET}"
 echo -e "${C_YELLOW}  Host:        $HOSTNAME_VAL${C_RESET}"
 echo -e "${C_YELLOW}  Operator:    $CURRENT_OPERATOR${C_RESET}"
@@ -472,6 +478,36 @@ if ! is_safe_user "$CURRENT_OPERATOR"; then
     log "Adding operator '$CURRENT_OPERATOR' to protected list for this session." "WARNING"
     SAFE_USERS+=("$CURRENT_OPERATOR")
 fi
+
+# --- 1a.5: Ensure Blue Team admin accounts exist ----------------------------
+log "Ensuring Blue Team admin accounts exist..." "INFO"
+
+for admin in "${AUTHORIZED_ADMINS[@]}"; do
+    if id "$admin" &>/dev/null; then
+        log "Blue Team admin '$admin' already exists." "INFO"
+    else
+        log "Creating Blue Team admin account: $admin" "WARNING"
+
+        # Create user with home directory and bash shell
+        useradd -m -s /bin/bash "$admin" 2>/dev/null && \
+            log "  User created: $admin" "SUCCESS" || \
+            log "  Failed to create user: $admin" "ERROR"
+
+        # Add to sudo group (Debian/Ubuntu)
+        usermod -aG sudo "$admin" 2>/dev/null && \
+            log "  Added $admin to sudo group." "SUCCESS" || \
+            log "  Failed to add $admin to sudo group." "WARNING"
+
+        # Set initial password (if configured)
+        if [[ -n "$SET_ALL_USER_PASSWORDS" ]]; then
+            echo "$admin:$SET_ALL_USER_PASSWORDS" | chpasswd 2>/dev/null && \
+                log "  Password set for $admin." "SUCCESS" || \
+                log "  Failed to set password for $admin." "WARNING"
+        fi
+
+        add_change "Users" "Created Blue Team admin account" "SUCCESS" "$admin"
+    fi
+done
 
 # --- 1b: Scan for unauthorized users ----------------------------------------
 log "Scanning all user accounts for unauthorized entries..." "INFO"
@@ -1026,7 +1062,7 @@ PWQUAL="/etc/security/pwquality.conf"
 if [[ -f "$PWQUAL" ]]; then
     cp "$PWQUAL" "${PWQUAL}.bak.$(date +%s)" 2>/dev/null || true
     cat > "$PWQUAL" << 'PWEOF'
-# SecureNix - CDT Team Alpha - Hardened password quality
+# SecureNix - CDT Team Charlie - Hardened password quality
 # Safe to edit: pam_pwquality reads this independently, cannot break auth
 minlen = 12
 minclass = 3
@@ -1304,7 +1340,7 @@ else
     set_ssh_opt "Banner"                     "/etc/ssh/banner"
     cat > /etc/ssh/banner << 'SSHDBAN'
 *******************************************************************************
-     AUTHORIZED USERS ONLY - CDT Team Alpha Competition System
+     AUTHORIZED USERS ONLY!!!
      All unauthorized access attempts are monitored and logged.
      Blue Team is watching you...
      
@@ -1377,7 +1413,7 @@ log "Applying kernel network hardening (sysctl)..." "INFO"
 SYSCTL_FILE="/etc/sysctl.d/99-blueteam-hardening.conf"
 cat > "$SYSCTL_FILE" << 'SYSCTL'
 # =============================================================================
-# SecureNix - CDT Team Alpha - Kernel Hardening
+# SecureNix - CDT Team Charlie - Kernel Hardening
 # =============================================================================
 
 # --- Reverse path filtering (anti-spoofing) ---
@@ -1490,13 +1526,13 @@ cp /etc/hosts.deny  "/etc/hosts.deny.bak.$(date +%s)"   2>/dev/null || true
 cp /etc/hosts.allow "/etc/hosts.allow.bak.$(date +%s)"  2>/dev/null || true
 
 cat > /etc/hosts.deny << 'DENY'
-# SecureNix CDT Team Alpha - Deny all by default
+# SecureNix CDT Team Charlie - Deny all by default
 # Rule 7: This denies unknown hosts. ALLOWing ranges in hosts.allow is not a subnet block.
 ALL: ALL
 DENY
 
 {
-    echo "# SecureNix CDT Team Alpha - Whitelist: mgmt subnet + individual competition IPs"
+    echo "# SecureNix CDT Team Charlie - Whitelist: mgmt subnet + individual competition IPs"
     echo ""
     echo "# Loopback"
     echo "ALL: 127.0.0.1"
@@ -1893,8 +1929,7 @@ done
 log "Setting competition MOTD..." "INFO"
 cat > /etc/motd << 'MOTD'
 *******************************************************************************
-              CDT TEAM ALPHA - Blue Team Competition System
-              Spring 2026  |  FQDN: mlp.local
+              CDT TEAM Charlie - Blue Team
 *******************************************************************************
   Authorized users only. All activity is monitored and logged.
   Friendship is Magic, but security is BETTER.
@@ -1951,7 +1986,7 @@ fi
 log "Writing audit rules to $AUDIT_RULES..." "INFO"
 cat > "$AUDIT_RULES" << 'AUDITRULES'
 # ==============================================================================
-# SecureNix - CDT Team Alpha - Comprehensive Audit Rules
+# SecureNix - CDT Team Charlie - Comprehensive Audit Rules
 # ==============================================================================
 
 # Delete all existing rules and set buffer size
@@ -2224,7 +2259,7 @@ cat > "$STATE_FILE" << JSON
   "MaxPasswordChanges": $MAX_PASSWORD_CHANGES,
   "Hostname":           "$HOSTNAME_VAL",
   "Operator":           "$CURRENT_OPERATOR",
-  "ScriptVersion":      "2.0-CDT-Alpha",
+  "ScriptVersion":      "2.0-CDT-Charlie",
   "LogFile":            "$LOG_FILE"
 }
 JSON
