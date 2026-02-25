@@ -1367,6 +1367,10 @@ SSHDBAN
         "${COMP_USERS[@]}" \
         "${AUTHORIZED_ADMINS[@]}" \
         "greyteam" \
+        "grayteam" \
+        "grey_team" \
+        "gray_team" \
+        "scoring" \
         "$CURRENT_OPERATOR" \
         | sort -u | tr '\n' ' ' | sed 's/ $//')
     set_ssh_opt "AllowUsers" "$ALL_SSH_USERS"
