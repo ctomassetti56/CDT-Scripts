@@ -1541,18 +1541,6 @@ DENY
     echo "# Loopback"
     echo "ALL: 127.0.0.1"
     echo "ALL: ::1"
-
-        # If running over SSH, whitelist the current SSH client's IP to avoid lockout
-    if [[ -n "${SSH_CONNECTION:-}" ]]; then
-        ssh_client_ip="$(awk '{print $1}' <<< "$SSH_CONNECTION")"
-        # basic sanity check
-        if [[ "$ssh_client_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || "$ssh_client_ip" =~ : ]]; then
-            echo ""
-            echo "# Current SSH client (script runner) - lockout protection"
-            echo "ALL: $ssh_client_ip"
-        fi
-    fi
-    
     echo ""
     echo "# Full management subnet (172.20.0.0/24) - Grey Team may jump from any IP here."
     echo "# Rule 7 forbids BLOCKING subnets - this ALLOW rule is explicitly permitted."
