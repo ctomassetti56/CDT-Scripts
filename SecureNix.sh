@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # SecureNix.sh - Linux Hardening Script
-# Blue Team Hardening Script for CDT Competition - Team Alpha Spring 2026
+# Blue Team Hardening Script for CDT Competition - Team Charlie Spring 2026
 # ==============================================================================
 #
 # SYNOPSIS:
@@ -16,14 +16,20 @@
 #   2. SET_ALL_USER_PASSWORDS - Change to YOUR secure password (~line 185)
 #   3. SAFE_IP_ADDRESSES   - Scoring engine/jumpbox IPs (pre-filled from packet)
 #
-# CRITICAL_RULES (CDT Team Alpha Spring 2026):
+# CRITICAL_RULES (CDT Team Charlie Spring 2026):
 #   Rule 5:  DO NOT modify any file with "greyteam" in its name
-#   Rule 7:  DO NOT block entire subnets (no subnet blocking)
+#   Rule 7:  DO NOT BLOCK subnets - but ALLOWING a subnet range is fine!
 #   Rule 9:  DO NOT disable any valid user accounts listed in the packet
 #   Rule 10: DO NOT disable SSH on Linux machines - only HARDEN it!
 #   Rule 14: Password changes limited to 3 per host per comp session
 #   Rule 15: Red Team tools only run if /greyteam_key exists - DO NOT DELETE IT
 #   Rule 16: Blue Team may request up to 3 host reverts per competition day
+#
+# GREYTEAM NOTES (learned from competition feedback - Grey Team is real infra):
+#   - "greyteam" user is NOT in the packet but IS a valid system user - never lock!
+#   - SSH AllowUsers MUST include greyteam or Grey Team loses SSH access entirely
+#   - TCP Wrappers + UFW MUST whitelist 172.20.0.0/24 - they jump from anywhere in mgmt range
+#   - PAM common-auth/account/password MUST NOT be edited - previous edit broke ALL auth
 #
 # SCORED LINUX SERVICES:
 #   ponyville       (10.0.10.3)  Debian 13    Apache2
@@ -37,10 +43,10 @@
 #   whinnyapolis    (10.0.30.6)  Ubuntu 24.04 Workstation
 #
 # NOTES:
-#   Author:       CDT Team Alpha + Claude AI
+#   Author:       Christian Tomassetti + Claude AI
 #   Requires:     Bash 4+ and root (sudo) privileges
 #   Compatible:   Debian 13 (Trixie), Ubuntu 24.04 LTS
-#   Last Updated: 02/23/2026
+#   Last Updated: 02/25/2026
 #
 # USAGE:
 #   sudo ./SecureNix.sh [OPTIONS]
@@ -90,8 +96,7 @@ show_help() {
     echo ""
     echo "================================================================================"
     echo "                SecureNix.sh - Linux Hardening Script"
-    echo "                CDT Team Alpha - Spring 2026 | FQDN: mlp.local"
-    echo "                Time to lock out the Legion... For good :)"
+    echo "                Time to lock out Red... For good :)"
     echo "================================================================================"
     echo ""
     echo "USAGE:"
@@ -188,7 +193,7 @@ else
 fi
 
 # ==============================================================================
-# CRITICAL COMPETITION VARIABLES - CDT TEAM ALPHA SPRING 2026
+# CRITICAL COMPETITION VARIABLES - CDT TEAM Charlie SPRING 2026
 # *** EDIT THE SECTIONS MARKED BELOW BEFORE RUNNING ***
 # ==============================================================================
 
@@ -196,6 +201,11 @@ fi
 # SAFE USERS - Competition packet users (Rule 9: DO NOT disable these!)
 # ---------------------------------------------------------------------------
 SAFE_USERS=(
+    # === GREY TEAM (infrastructure) - NOT in packet but MUST NEVER be touched ===
+    # greyteam logs in via SSH to manage infrastructure. Any global change that
+    # affects all users (AllowUsers, PAM, account locking) must preserve this account.
+    "greyteam" "grayteam" "grey_team" "gray_team"
+
     # === SYSTEM / SERVICE ACCOUNTS (never touch these) ===
     "root" "daemon" "bin" "sys" "sync" "games" "man" "lp" "mail"
     "news" "uucp" "proxy" "www-data" "backup" "list" "irc" "gnats"
@@ -234,6 +244,14 @@ COMP_USERS=(
 # *** EDIT THIS LIST WITH YOUR ACTUAL BLUE TEAM USERNAMES ***
 AUTHORIZED_ADMINS=(
     "blueadmin"
+    "bigmac"
+    "mayormare"
+    "shiningarmor"
+    "cadance"
+    "celestia"
+    "discord"
+    "luna"
+    "starswirl"
 )
 
 # ---------------------------------------------------------------------------
@@ -246,44 +264,71 @@ SET_ALL_USER_PASSWORDS="MyLittlePonySucks1!"   # <--- CHANGE ME
 
 # ---------------------------------------------------------------------------
 # SAFE IP ADDRESSES - Scoring engine, jumpboxes, competition infrastructure
-# Per Rule 7: These are individual IPs only, NOT subnet blocks!
+# Rule 7: Do NOT block subnets. Whitelisting (ALLOWING) a range is fine.
+#
+# GREY TEAM ACCESS: Grey Team may jump from ANY IP in 172.20.0.0/24, not just
+# the listed jumpboxes. MGMT_SUBNET below is whitelisted in UFW + TCP Wrappers
+# so Grey Team infra access is never blocked regardless of which host they use.
 # ---------------------------------------------------------------------------
 SAFE_IP_ADDRESSES=(
     # Scoring engine (CRITICAL - never block this!)
+    # Accessible via: https://scoring.mlp.local:443  |  nc scoring.mlp.local 444  |  172.20.0.100:444
     "172.20.0.100"
-    # Blue Team jumpboxes (jumpblue1-10)
-    "172.20.0.41"   # jumpblue1
-    "172.20.0.42"   # jumpblue2
-    "172.20.0.43"   # jumpblue3
-    "172.20.0.44"   # jumpblue4
-    "172.20.0.45"   # jumpblue5
-    "172.20.0.46"   # jumpblue6
-    "172.20.0.47"   # jumpblue7
-    "172.20.0.48"   # jumpblue8
-    "172.20.0.49"   # jumpblue9
-    "172.20.0.40"   # jumpblue10
-    # Core subnet scored hosts (10.0.10.x)
-    "10.0.10.1"     # canterlot      - Active Directory
-    "10.0.10.2"     # manehatten     - MSSQL
-    "10.0.10.3"     # ponyville      - Apache2
-    "10.0.10.4"     # seaddle        - MariaDB
-    "10.0.10.5"     # trotsylvania   - CUPS
-    "10.0.10.6"     # crystal-empire - vsftpd
-    # DMZ subnet scored hosts (10.0.20.x)
-    "10.0.20.1"     # las-pegasus    - IIS
-    "10.0.20.2"     # appleloosa     - SMB
-    "10.0.20.3"     # everfree-forest - IRC
-    "10.0.20.4"     # griffonstone   - Nginx
-    # Internal subnet workstations (10.0.30.x)
-    "10.0.30.1"     # baltamare      - Windows 10 Workstation
-    "10.0.30.2"     # neighara-falls - Windows 10 Workstation
-    "10.0.30.3"     # fillydelphia   - Windows 10 Workstation
-    "10.0.30.4"     # cloudsdale     - Ubuntu 24.04 Workstation
-    "10.0.30.5"     # vanhoover      - Ubuntu 24.04 Workstation
-    "10.0.30.6"     # whinnyapolis   - Ubuntu 24.04 Workstation
+
+    # Blue Team jumpboxes (jumpblue1-10) - Ubuntu 24.04 Desktop, 172.20.32-127 mgmt subnet
+    # Credentials for all jumpboxes: Friendship0!
+    # Access: CyberRange Sshwifty (CLI) or CyberRange RustDesk Relay (GUI)
+    "172.20.0.41"   # jumpblue1  | ExtIP: 100.65.6.247  | RustDesk: 507 549 506
+    "172.20.0.42"   # jumpblue2  | ExtIP: 100.65.6.186  | RustDesk: 514 264 008
+    "172.20.0.43"   # jumpblue3  | ExtIP: 100.65.7.94   | RustDesk: 515 186 532
+    "172.20.0.44"   # jumpblue4  | ExtIP: 100.65.6.185  | RustDesk: 513 810 519
+    "172.20.0.45"   # jumpblue5  | ExtIP: 100.65.7.201  | RustDesk: 503 969 997  [UPDATED - overrides packet]
+    "172.20.0.46"   # jumpblue6  | ExtIP: 100.65.3.191  | RustDesk: 199 067 4293
+    "172.20.0.47"   # jumpblue7  | ExtIP: 100.65.6.2    | RustDesk: 512 381 411
+    "172.20.0.48"   # jumpblue8  | ExtIP: 100.65.3.215  | RustDesk: 506 287 610
+    "172.20.0.49"   # jumpblue9  | ExtIP: 100.65.8.5    | RustDesk: 503 963 007
+    "172.20.0.40"   # jumpblue10 | ExtIP: 100.65.2.107  | RustDesk: 519 436 120
+    "100.65.6.247"  # jumpblue1  | ExtIP: 100.65.6.247  | RustDesk: 507 549 506
+    "100.65.6.186"  # jumpblue2  | ExtIP: 100.65.6.186  | RustDesk: 514 264 008
+    "100.65.7.94"   # jumpblue3  | ExtIP: 100.65.7.94   | RustDesk: 515 186 532
+    "100.65.6.185"  # jumpblue4  | ExtIP: 100.65.6.185  | RustDesk: 513 810 519
+    "100.65.7.201"  # jumpblue5  | ExtIP: 100.65.7.201  | RustDesk: 503 969 997  [UPDATED - overrides packet]
+    "100.65.3.191"  # jumpblue6  | ExtIP: 100.65.3.191  | RustDesk: 199 067 4293
+    "100.65.6.2"    # jumpblue7  | ExtIP: 100.65.6.2    | RustDesk: 512 381 411
+    "100.65.3.215"  # jumpblue8  | ExtIP: 100.65.3.215  | RustDesk: 506 287 610
+    "100.65.8.5"    # jumpblue9  | ExtIP: 100.65.8.5    | RustDesk: 503 963 007
+    "100.65.2.107"  # jumpblue10 | ExtIP: 100.65.2.107  | RustDesk: 519 436 120
+
+    # Core subnet scored hosts (10.0.10.0/24)
+    "10.0.10.1"     # canterlot       - Windows Server 2022 - Active Directory
+    "10.0.10.2"     # manehatten      - Windows Server 2022 - MSSQL
+    "10.0.10.3"     # ponyville       - Debian 13           - Apache2
+    "10.0.10.4"     # seaddle         - Debian 13           - MariaDB
+    "10.0.10.5"     # trotsylvania    - Debian 13           - CUPS
+    "10.0.10.6"     # crystal-empire  - Debian 13           - vsftpd
+
+    # DMZ subnet scored hosts (10.0.20.0/24)
+    "10.0.20.1"     # las-pegasus     - Windows Server 2022 - IIS
+    "10.0.20.2"     # appleloosa      - Windows Server 2022 - SMB
+    "10.0.20.3"     # everfree-forest - Debian 13           - IRC
+    "10.0.20.4"     # griffonstone    - Debian 13           - Nginx
+
+    # Internal subnet workstations (10.0.30.0/24)
+    "10.0.30.1"     # baltamare       - Windows 10          - Workstation
+    "10.0.30.2"     # neighara-falls  - Windows 10          - Workstation
+    "10.0.30.3"     # fillydelphia    - Windows 10          - Workstation
+    "10.0.30.4"     # cloudsdale      - Ubuntu 24.04        - Workstation
+    "10.0.30.5"     # vanhoover       - Ubuntu 24.04        - Workstation
+    "10.0.30.6"     # whinnyapolis    - Ubuntu 24.04        - Workstation
+
     # Loopback (always safe)
     "127.0.0.1" "::1"
 )
+
+# Full management subnet - whitelisted as an ALLOW range in UFW and TCP Wrappers.
+# Grey Team uses 172.20.0.0/24 but their exact source IP is unpredictable.
+# Rule 7 prohibits BLOCKING subnets - this is an ALLOW rule, which is fine.
+MGMT_SUBNET="172.20.0.0/24"
 
 # Known safe listening ports (used by backdoor detection scanner)
 SAFE_PORTS=(
@@ -390,8 +435,7 @@ is_admin_user() {
 echo ""
 echo -e "${C_CYAN}================================================================================${C_RESET}"
 echo -e "${C_GREEN}           SecureNix.sh - Linux Hardening Script${C_RESET}"
-echo -e "${C_GREEN}           CDT Team Alpha - Spring 2026 | FQDN: mlp.local${C_RESET}"
-echo -e "${C_GREEN}           Time to lock out the Legion... For good :)${C_RESET}"
+echo -e "${C_GREEN}           Time to lock out Red... For good :)${C_RESET}"
 echo -e "${C_CYAN}================================================================================${C_RESET}"
 echo -e "${C_YELLOW}  Host:        $HOSTNAME_VAL${C_RESET}"
 echo -e "${C_YELLOW}  Operator:    $CURRENT_OPERATOR${C_RESET}"
@@ -434,6 +478,36 @@ if ! is_safe_user "$CURRENT_OPERATOR"; then
     log "Adding operator '$CURRENT_OPERATOR' to protected list for this session." "WARNING"
     SAFE_USERS+=("$CURRENT_OPERATOR")
 fi
+
+# --- 1a.5: Ensure Blue Team admin accounts exist ----------------------------
+log "Ensuring Blue Team admin accounts exist..." "INFO"
+
+for admin in "${AUTHORIZED_ADMINS[@]}"; do
+    if id "$admin" &>/dev/null; then
+        log "Blue Team admin '$admin' already exists." "INFO"
+    else
+        log "Creating Blue Team admin account: $admin" "WARNING"
+
+        # Create user with home directory and bash shell
+        useradd -m -s /bin/bash "$admin" 2>/dev/null && \
+            log "  User created: $admin" "SUCCESS" || \
+            log "  Failed to create user: $admin" "ERROR"
+
+        # Add to sudo group (Debian/Ubuntu)
+        usermod -aG sudo "$admin" 2>/dev/null && \
+            log "  Added $admin to sudo group." "SUCCESS" || \
+            log "  Failed to add $admin to sudo group." "WARNING"
+
+        # Set initial password (if configured)
+        if [[ -n "$SET_ALL_USER_PASSWORDS" ]]; then
+            echo "$admin:$SET_ALL_USER_PASSWORDS" | chpasswd 2>/dev/null && \
+                log "  Password set for $admin." "SUCCESS" || \
+                log "  Failed to set password for $admin." "WARNING"
+        fi
+
+        add_change "Users" "Created Blue Team admin account" "SUCCESS" "$admin"
+    fi
+done
 
 # --- 1b: Scan for unauthorized users ----------------------------------------
 log "Scanning all user accounts for unauthorized entries..." "INFO"
@@ -939,13 +1013,15 @@ log "Phase 1 complete." "SUCCESS"
 fi  # end Phase 1
 
 # ==============================================================================
-# PHASE 2 - PASSWORD POLICY HARDENING (PAM)
+# PHASE 2 - PASSWORD POLICY HARDENING
 # ==============================================================================
 if $RUN_PHASE2; then
 log "" "INFO"
 log "============================================================" "INFO"
-log "PHASE 2: PASSWORD POLICY HARDENING (PAM)" "CRITICAL"
+log "PHASE 2: PASSWORD POLICY HARDENING" "CRITICAL"
 log "============================================================" "INFO"
+log "SAFE APPROACH: Only touching pwquality.conf and login.defs." "WARNING"
+log "PAM common-auth/account/password intentionally NOT modified (broke all auth in testing)." "WARNING"
 
 # Install PAM password quality library
 if command -v apt-get &>/dev/null; then
@@ -954,7 +1030,7 @@ if command -v apt-get &>/dev/null; then
         grep -E "install|upgraded" | while IFS= read -r l; do log "$l" "INFO"; done || true
 fi
 
-# --- 2a: /etc/login.defs -----------------------------------------------------
+# --- 2a: /etc/login.defs (safe - shadow-utils config, not a PAM stack file) --
 log "Hardening /etc/login.defs..." "INFO"
 LOGIN_DEFS="/etc/login.defs"
 cp "$LOGIN_DEFS" "${LOGIN_DEFS}.bak.$(date +%s)" 2>/dev/null || true
@@ -978,13 +1054,16 @@ set_login_def "UMASK"          "027"
 add_change "PasswordPolicy" "login.defs hardened" "SUCCESS" "90d max, 12 char min"
 log "login.defs updated." "SUCCESS"
 
-# --- 2b: PAM pwquality.conf --------------------------------------------------
+# --- 2b: pwquality.conf (safe - standalone config, cannot break auth stack) --
+# pam_pwquality.so reads this file independently. Misconfiguration here only
+# affects password complexity enforcement - it cannot lock anyone out.
 log "Configuring /etc/security/pwquality.conf..." "INFO"
 PWQUAL="/etc/security/pwquality.conf"
 if [[ -f "$PWQUAL" ]]; then
     cp "$PWQUAL" "${PWQUAL}.bak.$(date +%s)" 2>/dev/null || true
     cat > "$PWQUAL" << 'PWEOF'
-# SecureNix - CDT Team Alpha - Hardened password quality
+# SecureNix - CDT Team Charlie - Hardened password quality
+# Safe to edit: pam_pwquality reads this independently, cannot break auth
 minlen = 12
 minclass = 3
 maxrepeat = 3
@@ -999,44 +1078,28 @@ enforcing = 1
 PWEOF
     add_change "PasswordPolicy" "pwquality.conf hardened" "SUCCESS" "minlen=12 minclass=3"
     log "pwquality.conf hardened." "SUCCESS"
+else
+    log "pwquality.conf not found - libpam-pwquality may not be installed yet." "WARNING"
 fi
 
-# --- 2c: PAM common-password -------------------------------------------------
-log "Configuring PAM common-password..." "INFO"
-PAMPASS="/etc/pam.d/common-password"
-if [[ -f "$PAMPASS" ]]; then
-    cp "$PAMPASS" "${PAMPASS}.bak.$(date +%s)" 2>/dev/null || true
-    if ! grep -q "pam_pwquality" "$PAMPASS"; then
-        sed -i '/pam_unix.so/i password\trequisite\t\t\t\tpam_pwquality.so retry=3 enforce_for_root' "$PAMPASS"
-    fi
-    if grep -q "pam_unix.so" "$PAMPASS" && ! grep -q "remember=" "$PAMPASS"; then
-        sed -i '/pam_unix.so/ s/$/ remember=5/' "$PAMPASS"
-    fi
-    add_change "PasswordPolicy" "PAM common-password" "SUCCESS" "pwquality enforced, remember=5"
-    log "PAM common-password configured." "SUCCESS"
-fi
+# --- 2c: PAM files - INTENTIONALLY NOT MODIFIED -----------------------------
+# /etc/pam.d/common-auth, common-account, and common-password are NOT touched.
+# During testing, blind sed surgery on these files broke ALL authentication
+# system-wide including greyteam, all packet users, and the operator account.
+# The correct approach requires pam-auth-update(8) with a tested profile.
+# pwquality.conf + login.defs provide sufficient hardening for competition.
+log "PAM common-auth/account/password: intentionally NOT modified." "INFO"
+log "  Reason: Previous edits broke system-wide auth for ALL users." "WARNING"
+log "  Safe hardening in use: pwquality.conf + login.defs." "INFO"
 
-# --- 2d: PAM account lockout (pam_faillock) ----------------------------------
-log "Configuring PAM account lockout (pam_faillock)..." "INFO"
-PAMAUTH="/etc/pam.d/common-auth"
-PAMACCT="/etc/pam.d/common-account"
-if [[ -f "$PAMAUTH" ]]; then
-    cp "$PAMAUTH" "${PAMAUTH}.bak.$(date +%s)" 2>/dev/null || true
-    if ! grep -q "pam_faillock" "$PAMAUTH"; then
-        sed -i "1s|^|auth\trequired\t\t\t\tpam_faillock.so preauth silent deny=5 unlock_time=900 fail_interval=900\n|" "$PAMAUTH"
-        echo -e "auth\t[default=die]\t\t\t\tpam_faillock.so authfail deny=5 unlock_time=900 fail_interval=900" >> "$PAMAUTH"
-    fi
-    add_change "PasswordPolicy" "PAM pam_faillock" "SUCCESS" "deny=5 unlock=15min"
-    log "Account lockout configured (5 failures = 15 min lockout)." "SUCCESS"
-fi
-if [[ -f "$PAMACCT" ]] && ! grep -q "pam_faillock" "$PAMACCT"; then
-    echo -e "account\trequired\t\t\t\tpam_faillock.so" >> "$PAMACCT"
-fi
-
-# --- 2e: Password aging on competition accounts -----------------------------
-log "Applying password aging to competition users..." "INFO"
+# --- 2d: Password aging on competition accounts (safe - chage utility) -------
+log "Applying password aging to existing competition users..." "INFO"
 for cuser in "${COMP_USERS[@]}"; do
-    id "$cuser" &>/dev/null && chage -M 90 -m 1 -W 7 "$cuser" 2>/dev/null || true
+    if id "$cuser" &>/dev/null; then
+        chage -M 90 -m 1 -W 7 "$cuser" 2>/dev/null && \
+            log "  Password aging applied: $cuser (max 90d, warn 7d)" "SUCCESS" || \
+            log "  Could not set aging for: $cuser" "WARNING"
+    fi
 done
 add_change "PasswordPolicy" "chage aging on comp users" "SUCCESS" "90d max, 1d min, 7d warn"
 log "Password aging applied." "SUCCESS"
@@ -1170,8 +1233,8 @@ else
     log "No service-specific ports to open for: $SERVICE_NAME" "INFO"
 fi
 
-# --- Whitelist scoring engine and jumpboxes individually --------------------
-log "Whitelisting scoring engine and jumpbox IPs (individual IPs - Rule 7)..." "INFO"
+# --- Whitelist individual competition infrastructure IPs --------------------
+log "Whitelisting individual competition infrastructure IPs..." "INFO"
 for ip in "${SAFE_IP_ADDRESSES[@]}"; do
     # Skip loopback (UFW handles that natively)
     [[ "$ip" == "127.0.0.1" || "$ip" == "::1" ]] && continue
@@ -1179,6 +1242,14 @@ for ip in "${SAFE_IP_ADDRESSES[@]}"; do
         log "  Could not add UFW rule for $ip" "WARNING"
 done
 add_change "Firewall" "Safe IPs whitelisted" "SUCCESS" "${#SAFE_IP_ADDRESSES[@]} IPs"
+
+# --- Whitelist entire management subnet for Grey Team -----------------------
+# Grey Team may access from ANY IP in 172.20.0.0/24, not just the listed jumpboxes.
+# Rule 7 forbids BLOCKING subnets - whitelisting/ALLOWING a range is explicitly fine.
+log "Whitelisting management subnet $MGMT_SUBNET for Grey Team access..." "INFO"
+ufw allow from "$MGMT_SUBNET" to any comment "Grey Team mgmt subnet - ALLOW per Rule 7"
+add_change "Firewall" "Grey Team mgmt subnet allowed" "SUCCESS" "$MGMT_SUBNET"
+log "  Grey Team can access from any IP in $MGMT_SUBNET" "SUCCESS"
 
 # --- Block high-risk attack ports -------------------------------------------
 log "Blocking known attack/unnecessary ports..." "INFO"
@@ -1248,7 +1319,8 @@ else
     set_ssh_opt "GatewayPorts"               "no"
     set_ssh_opt "HostbasedAuthentication"    "no"
     set_ssh_opt "IgnoreRhosts"               "yes"
-    set_ssh_opt "RhostsRSAAuthentication"    "no"
+    # RhostsRSAAuthentication intentionally omitted - deprecated in OpenSSH 7.4+,
+    # removed in 8.x. Debian 13 ships OpenSSH 9.x and this option causes errors.
 
     # Timeout and keepalive (detect dead connections)
     set_ssh_opt "ClientAliveInterval"        "300"
@@ -1268,17 +1340,43 @@ else
     set_ssh_opt "Banner"                     "/etc/ssh/banner"
     cat > /etc/ssh/banner << 'SSHDBAN'
 *******************************************************************************
-     AUTHORIZED USERS ONLY - CDT Team Alpha Competition System
+     AUTHORIZED USERS ONLY!!!
      All unauthorized access attempts are monitored and logged.
-     Legion of Doom: you will not pass!
+     Blue Team is watching you...
+     
+  ⠀⠀⠀⠀           ⠀⠀    ⠀ ⠀⢐⢠⣤⣄⡀⣧⣟⣿⣥⣼⣷⣾⣶⣶⣴⣶⣦⣬⣁⠀
+ ⠀⠀⠀⠀    ⠀⠀⠀⠀ ⠀ ⠀   ⣤⣠⣅⣶⣾⣿⣷⣿⣿⣿⡿⡿⠿⡿⠿⣿⡿⣿⣿⣿⣿⣿⣿⣿⣷⣾⣽⣲⡡⡀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⠀⡀⣀⣴⣾⣿⣿⣿⣿⣿⣿⣿⢿⠉⣡⣾⣶⣾⣿⣷⣿⣿⣮⣦⢫⡟⢿⣿⣿⣿⣿⣿⣿⣷⣧⣤⣦⢤⣀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⣠⣶⣷⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠎⢰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⡦⡷⣎⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣾⣏⣷⡄⣀⠀⡄⠀⠀⠀⠀⠀⠀
+     ⠀⣠⢦⢄⣤⣽⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠆⣼⣿⣼⣉⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣺⠾⣵⢦⣀⠀⠀
+⢺⠽⡇⣾⣹⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⢬⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⢳⡿⣛⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢟⣿⣿⣜⣆⠀
+    ⠀ ⠉⠉⠉⠙⠻⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣹⡆⠚⢿⣿⣿⣿⢿⣿⣿⠻⠀⣀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣹⣏⠟⠉⠉
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠛⠻⡿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣭⣢⡏⠀⠀⠈⢠⣛⣰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⡺⠁⠀⠉⠀
+  ⠀⠀⠀⠀   ⠀⠀⠀  ⠀⠀⠀⠀  ⠀⠙⠛⠿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⡟⠀⠙⠀
+  ⠀⠀⠀⠀⠀      ⠀⠀⠀⠀   ⠀⠀⠀  ⠀⠈⠀⠃⢋⠛⠙⢿⠿⢻⡿⠿⡿⠿⠿⢿⣟⠋⠏⠀⠀⠉
+
 *******************************************************************************
 SSHDBAN
     chmod 644 /etc/ssh/banner 2>/dev/null || true
 
-    # Restrict SSH to only known competition + admin users
-    ALL_SSH_USERS=$(printf '%s\n' "${COMP_USERS[@]}" "${AUTHORIZED_ADMINS[@]}" | sort -u | tr '\n' ' ')
+    # Build AllowUsers: packet users + blue team admins + greyteam (REQUIRED) + operator
+    # CRITICAL: greyteam MUST be in AllowUsers - it's not in the packet but it IS a
+    # real system user. AllowUsers is a strict whitelist: anyone not listed is locked
+    # out of SSH entirely. The operator is also always included (self-lockout protection).
+    ALL_SSH_USERS=$(printf '%s\n' \
+        "${COMP_USERS[@]}" \
+        "${AUTHORIZED_ADMINS[@]}" \
+        "greyteam" \
+        "grayteam" \
+        "grey_team" \
+        "gray_team" \
+        "scoring" \
+        "$CURRENT_OPERATOR" \
+        | sort -u | tr '\n' ' ' | sed 's/ $//')
     set_ssh_opt "AllowUsers" "$ALL_SSH_USERS"
     log "AllowUsers set to: $ALL_SSH_USERS" "INFO"
+    log "  NOTE: greyteam explicitly included (not in packet but required for infra access)." "INFO"
+    log "  NOTE: $CURRENT_OPERATOR explicitly included (self-lockout protection)." "INFO"
 
     # Secure the sshd_config itself
     chmod 600 "$SSHD_CONFIG"
@@ -1319,7 +1417,7 @@ log "Applying kernel network hardening (sysctl)..." "INFO"
 SYSCTL_FILE="/etc/sysctl.d/99-blueteam-hardening.conf"
 cat > "$SYSCTL_FILE" << 'SYSCTL'
 # =============================================================================
-# SecureNix - CDT Team Alpha - Kernel Hardening
+# SecureNix - CDT Team Charlie - Kernel Hardening
 # =============================================================================
 
 # --- Reverse path filtering (anti-spoofing) ---
@@ -1427,23 +1525,36 @@ done
 
 # --- 5d: TCP Wrappers (hosts.deny / hosts.allow) -----------------------------
 log "Configuring TCP Wrappers..." "INFO"
+log "  Grey Team mgmt subnet $MGMT_SUBNET will be whitelisted in addition to individual IPs." "INFO"
 cp /etc/hosts.deny  "/etc/hosts.deny.bak.$(date +%s)"   2>/dev/null || true
 cp /etc/hosts.allow "/etc/hosts.allow.bak.$(date +%s)"  2>/dev/null || true
 
 cat > /etc/hosts.deny << 'DENY'
-# SecureNix CDT Team Alpha - Deny all by default (Rule 7: no subnet blocking)
+# SecureNix CDT Team Charlie - Deny all by default
+# Rule 7: This denies unknown hosts. ALLOWing ranges in hosts.allow is not a subnet block.
 ALL: ALL
 DENY
 
 {
-    echo "# SecureNix CDT Team Alpha - Competition infrastructure whitelist"
+    echo "# SecureNix CDT Team Charlie - Whitelist: mgmt subnet + individual competition IPs"
+    echo ""
+    echo "# Loopback"
     echo "ALL: 127.0.0.1"
     echo "ALL: ::1"
-    for ip in "${SAFE_IP_ADDRESSES[@]}"; do echo "ALL: $ip"; done
+    echo ""
+    echo "# Full management subnet (172.20.0.0/24) - Grey Team may jump from any IP here."
+    echo "# Rule 7 forbids BLOCKING subnets - this ALLOW rule is explicitly permitted."
+    echo "ALL: 172.20.0.0/255.255.255.0"
+    echo ""
+    echo "# Individual competition infrastructure IPs"
+    for ip in "${SAFE_IP_ADDRESSES[@]}"; do
+        [[ "$ip" == "127.0.0.1" || "$ip" == "::1" ]] && continue
+        echo "ALL: $ip"
+    done
 } > /etc/hosts.allow
 
-add_change "Network" "TCP Wrappers configured" "SUCCESS" "deny all, allow safe IPs"
-log "TCP Wrappers configured." "SUCCESS"
+add_change "Network" "TCP Wrappers configured" "SUCCESS" "deny all; allow $MGMT_SUBNET + individual IPs"
+log "TCP Wrappers configured. Management subnet $MGMT_SUBNET whitelisted for Grey Team." "SUCCESS"
 
 # --- 5e: Disable USB mass storage --------------------------------------------
 log "Blacklisting USB mass storage..." "INFO"
@@ -1822,8 +1933,7 @@ done
 log "Setting competition MOTD..." "INFO"
 cat > /etc/motd << 'MOTD'
 *******************************************************************************
-              CDT TEAM ALPHA - Blue Team Competition System
-              Spring 2026  |  FQDN: mlp.local
+              CDT TEAM Charlie - Blue Team
 *******************************************************************************
   Authorized users only. All activity is monitored and logged.
   Friendship is Magic, but security is BETTER.
@@ -1880,7 +1990,7 @@ fi
 log "Writing audit rules to $AUDIT_RULES..." "INFO"
 cat > "$AUDIT_RULES" << 'AUDITRULES'
 # ==============================================================================
-# SecureNix - CDT Team Alpha - Comprehensive Audit Rules
+# SecureNix - CDT Team Charlie - Comprehensive Audit Rules
 # ==============================================================================
 
 # Delete all existing rules and set buffer size
@@ -2153,7 +2263,7 @@ cat > "$STATE_FILE" << JSON
   "MaxPasswordChanges": $MAX_PASSWORD_CHANGES,
   "Hostname":           "$HOSTNAME_VAL",
   "Operator":           "$CURRENT_OPERATOR",
-  "ScriptVersion":      "2.0-CDT-Alpha",
+  "ScriptVersion":      "2.0-CDT-Charlie",
   "LogFile":            "$LOG_FILE"
 }
 JSON
